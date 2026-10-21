@@ -1,6 +1,7 @@
 'use strict';
 /* Decode Me If You Can: The Vault — static client. All locked content in DATA is AES-GCM encrypted. */
 const D = window.DATA;
+const NOFX = /nofx/.test(location.search); if (NOFX) document.documentElement.classList.add('nofx');
 const $app = document.getElementById('app');
 const enc = new TextEncoder(), dcd = new TextDecoder();
 const SALT = Uint8Array.from(atob(D.salt), (c) => c.charCodeAt(0));
@@ -78,6 +79,7 @@ function scramble(el, final, ms) {
     el.textContent = p < 1 ? o : final;
     if (p < 1) requestAnimationFrame(f);
   })(t0);
+  setTimeout(() => { el.textContent = final; }, ms + 150);
 }
 addEventListener('pointermove', (e) => {
   document.documentElement.style.setProperty('--mx', e.clientX + 'px');
@@ -103,16 +105,58 @@ const feedLine = () => {
 /* ---------- detective-board backdrop ---------- */
 const HOUSE = `<svg viewBox="0 0 120 90" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1a24"/><stop offset="1" stop-color="#2a1f1a"/></linearGradient></defs><rect width="120" height="90" fill="url(#sk)"/><circle cx="96" cy="16" r="6" fill="#d8d2b8" opacity=".8"/><path d="M10 90V52l14-14 14 14v38zM44 90V40l8-10 8 10V30h8v18l16 6v36z" fill="#07090b"/><rect x="20" y="60" width="6" height="8" fill="#F5B841" opacity=".85"/><rect x="50" y="52" width="5" height="7" fill="#F5B841" opacity=".7"/><rect x="72" y="66" width="6" height="8" fill="#F5B841" opacity=".6"/></svg>`;
 const MAP = `<svg viewBox="0 0 120 90" preserveAspectRatio="xMidYMid slice"><rect width="120" height="90" fill="#1c2a30"/><g stroke="#56D4DD" stroke-opacity=".35" fill="none"><path d="M0 20h120M0 45h120M0 70h120M25 0v90M60 0v90M95 0v90"/><path d="M10 80 40 50l25 10 40-35" stroke="#F5B841" stroke-opacity=".6"/></g><g fill="#F07178"><circle cx="40" cy="50" r="3"/><circle cx="105" cy="25" r="3"/></g></svg>`;
-function boardHtml() {
-  return `<div class="board" aria-hidden="true"><div class="lamp"></div>
-  <svg class="strings" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid slice"><g stroke="#b3262d" stroke-width="1.8" fill="none" opacity=".75"><path d="M130 120 L430 340 L770 150 L890 430"/><path d="M430 340 L250 520"/><path d="M770 150 L620 50"/><path d="M130 120 L60 360"/></g><g fill="#d04048"><circle cx="130" cy="120" r="5"/><circle cx="430" cy="340" r="5"/><circle cx="770" cy="150" r="5"/><circle cx="890" cy="430" r="5"/><circle cx="250" cy="520" r="5"/><circle cx="60" cy="360" r="5"/></g></svg>
-  <div class="note n1">DIFFERENT CLUES.<br>SAME MYSTERY.<br>CAN YOU PUT IT<br>TOGETHER?</div>
-  <div class="note n2">Sometimes the most important messages are the ones never sent.</div>
-  <div class="note n3">FIVE TEAMS.<br>ONE MYSTERY.</div>
-  <div class="note map"><div></div></div>
-  <div class="polaroid p1">${HOUSE}</div><div class="polaroid p2">${MAP}</div><div class="polaroid p3">${HOUSE}</div></div>`;
+const HOODED = `<svg viewBox="0 0 120 90" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="mg" cx=".5" cy=".45" r=".6"><stop offset="0" stop-color="#2f6b3a"/><stop offset="1" stop-color="#05080a"/></radialGradient></defs><rect width="120" height="90" fill="url(#mg)"/><path d="M60 22c-14 0-22 10-22 22 0 6 2 10 4 13-12 4-22 12-24 33h84c-2-21-12-29-24-33 2-3 4-7 4-13 0-12-8-22-22-22z" fill="#050607"/><ellipse cx="60" cy="46" rx="11" ry="13" fill="#000"/><circle cx="55" cy="45" r="1.6" fill="#A3E635"/><circle cx="65" cy="45" r="1.6" fill="#A3E635"/></svg>`;
+const HALL = `<svg viewBox="0 0 120 90" preserveAspectRatio="xMidYMid slice"><rect width="120" height="90" fill="#0b1114"/><path d="M0 0 48 32v26L0 90zM120 0 72 32v26l48 32z" fill="#141c20"/><path d="M0 0h120L72 32H48z" fill="#10171a"/><path d="M0 90 48 58h24l48 32z" fill="#0d1417"/><rect x="48" y="32" width="24" height="26" fill="#cfe9d8" opacity=".85"/><g fill="#F5B841" opacity=".7"><rect x="20" y="8" width="12" height="3"/><rect x="88" y="8" width="12" height="3"/><rect x="52" y="22" width="16" height="2"/></g></svg>`;
+const BADGE = `<svg viewBox="0 0 120 90" preserveAspectRatio="xMidYMid slice"><rect width="120" height="90" fill="#1a1613"/><g transform="rotate(-8 60 45)"><rect x="30" y="12" width="60" height="66" rx="4" fill="#e8e2d0"/><rect x="36" y="20" width="22" height="26" fill="#2a2f33"/><circle cx="47" cy="30" r="5" fill="#0d1013"/><rect x="62" y="22" width="22" height="3" fill="#333"/><rect x="62" y="30" width="16" height="3" fill="#555"/><rect x="36" y="54" width="48" height="4" fill="#c33"/><rect x="36" y="64" width="30" height="3" fill="#333"/></g></svg>`;
+const TOWER = `<svg viewBox="0 0 120 90" preserveAspectRatio="xMidYMid slice"><rect width="120" height="90" fill="#16222c"/><rect x="30" y="14" width="60" height="76" fill="#0a0e11"/><g fill="#F5B841" opacity=".8"><rect x="38" y="22" width="6" height="6"/><rect x="52" y="22" width="6" height="6"/><rect x="66" y="40" width="6" height="6"/><rect x="38" y="52" width="6" height="6"/><rect x="80" y="22" width="6" height="6"/><rect x="52" y="64" width="6" height="6"/></g><g fill="#56D4DD" opacity=".5"><rect x="66" y="22" width="6" height="6"/><rect x="80" y="52" width="6" height="6"/></g></svg>`;
+let boardTimer = null;
+function buildBoard() {
+  const W = innerWidth, H = innerHeight, vw = W / 100;
+  const pol = (svg) => `<div class="bd-pol">${svg}</div>`;
+  // x,y = centre as % of viewport; w in vw; hr = height/width; z = depth layer 0 back .. 2 front
+  const items = [
+    { id: 'a', cls: 'bd-photo', x: 7, y: 30, w: 9, hr: 1.2, r: 5, z: 0, html: pol(HOODED) },
+    { id: 'b', cls: 'bd-card typed', x: 15, y: 13, w: 14, hr: .62, r: -5, z: 2, html: 'DIFFERENT CLUES.<br>SAME MYSTERY.<br>CAN YOU PUT IT<br>TOGETHER?' },
+    { id: 'c', cls: 'bd-photo', x: 31, y: 9, w: 8, hr: 1.2, r: -9, z: 0, html: pol(BADGE) },
+    { id: 'd', cls: 'bd-map', x: 62, y: 11, w: 13, hr: .72, r: 4, z: 1, html: '<i></i>' },
+    { id: 'e', cls: 'bd-sticky yellow hand', x: 85, y: 14, w: 10, hr: 1, r: 6, z: 2, html: 'who is<br>NullPhantom??' },
+    { id: 'f', cls: 'bd-photo', x: 91, y: 40, w: 10, hr: 1.2, r: -6, z: 1, html: pol(HALL) },
+    { id: 'g', cls: 'bd-card typed', x: 85, y: 70, w: 16, hr: .7, r: 3, z: 2, html: 'Sometimes the most important messages are the ones never sent.' },
+    { id: 'h', cls: 'bd-photo', x: 70, y: 84, w: 9, hr: 1.2, r: -4, z: 0, html: pol(TOWER) },
+    { id: 'i', cls: 'bd-log bd-paper', x: 28, y: 84, w: 16, hr: .95, r: -2, z: 1, html: '<b>ACCESS LOG</b><br>23:41:02 192.0.2.44<br>POST /admin/create_user<br>201 CREATED<br>23:41:09 GET /notes?data=<br>TkFJRElT… 200<br>▌' },
+    { id: 'j', cls: 'bd-photo', x: 9, y: 76, w: 11, hr: 1.2, r: -7, z: 2, html: pol(HOUSE) },
+    { id: 'k', cls: 'bd-sticky pink hand', x: 3.5, y: 52, w: 8, hr: 1, r: -8, z: 1, html: '23:41<br>server room!!' },
+    { id: 'l', cls: 'bd-card typed', x: 50, y: 94, w: 13, hr: .5, r: -1.5, z: 2, html: 'FIVE TEAMS.<br>ONE MYSTERY.' },
+  ];
+  const pins = {};
+  const els = items.map((it) => {
+    const w = it.w * vw, h = w * it.hr, px = it.x / 100 * W, py = it.y / 100 * H;
+    pins[it.id] = [px, py - h / 2 + 8];
+    return `<div class="it ${it.cls} z${it.z}" style="left:${px - w / 2}px;top:${py - h / 2}px;width:${w}px;height:${h}px;font-size:${w * .085}px;--r:${it.r}deg"><span class="tape"></span>${it.html}<span class="pin p${'abc'[it.id.charCodeAt(0) % 3]}"></span></div>`;
+  });
+  const links = ['a-b', 'b-c', 'c-d', 'd-e', 'e-f', 'f-g', 'g-h', 'h-i', 'i-j', 'j-k', 'k-a', 'b-i', 'd-g', 'c-k', 'e-h'];
+  const paths = links.map((l) => {
+    const [A, B] = l.split('-').map((k) => pins[k]), mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2 + 24 + Math.hypot(B[0] - A[0], B[1] - A[1]) * 0.07;
+    return `M${A[0]} ${A[1]} Q${mx} ${my} ${B[0]} ${B[1]}`;
+  });
+  const layer = (z) => els.filter((_, i) => items[i].z === z).join('');
+  return `<div class="cork" aria-hidden="true"><div class="lamp"></div>
+    <div class="layer l0">${layer(0)}</div>
+    <svg class="strings" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><g fill="none" stroke-linecap="round">${paths.map((d) => `<path d="${d}" stroke="#000" stroke-opacity=".55" stroke-width="3" transform="translate(2 7)" style="filter:blur(2px)"/><path d="${d}" stroke="#a8222a" stroke-width="2"/><path d="${d}" stroke="#ff7a80" stroke-opacity=".35" stroke-width=".7" transform="translate(0 -.6)"/>`).join('')}</g></svg>
+    <div class="layer l1">${layer(1)}</div><div class="layer l2">${layer(2)}</div>
+    <div class="grain"></div></div>`;
 }
-document.body.insertAdjacentHTML('afterbegin', boardHtml());
+function mountBoard() {
+  document.querySelectorAll('.cork').forEach((e) => e.remove());
+  document.body.insertAdjacentHTML('afterbegin', buildBoard());
+}
+mountBoard();
+addEventListener('resize', () => { clearTimeout(boardTimer); boardTimer = setTimeout(mountBoard, 200); });
+addEventListener('pointermove', (e) => {
+  const r = document.documentElement.style;
+  r.setProperty('--px', (e.clientX / innerWidth - 0.5).toFixed(3));
+  r.setProperty('--py', (e.clientY / innerHeight - 0.5).toFixed(3));
+});
 const SAFE = `<svg class="safe" viewBox="0 0 120 120"><defs><linearGradient id="mt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a4249"/><stop offset="1" stop-color="#14181c"/></linearGradient><radialGradient id="lt" cx=".7" cy=".1" r=".9"><stop offset="0" stop-color="#F5B841" stop-opacity=".35"/><stop offset="1" stop-color="#F5B841" stop-opacity="0"/></radialGradient></defs><rect x="6" y="6" width="108" height="108" rx="6" fill="url(#mt)" stroke="#555e66"/><rect x="16" y="16" width="88" height="88" rx="4" fill="#1b2025" stroke="#2C353F"/><circle cx="82" cy="60" r="16" fill="#101316" stroke="#7a858e" stroke-width="2"/><g stroke="#7a858e" stroke-width="2"><path d="M82 46v28M68 60h28M72 50l20 20M92 50 72 70"/></g><rect x="26" y="40" width="26" height="40" rx="2" fill="#0d1013" stroke="#2C353F"/><g fill="#A3E635" opacity=".8"><rect x="31" y="46" width="16" height="5"/></g><g fill="#56D4DD" opacity=".5"><rect x="31" y="56" width="4" height="4"/><rect x="38" y="56" width="4" height="4"/><rect x="45" y="56" width="4" height="4"/><rect x="31" y="63" width="4" height="4"/><rect x="38" y="63" width="4" height="4"/><rect x="45" y="63" width="4" height="4"/><rect x="31" y="70" width="4" height="4"/><rect x="38" y="70" width="4" height="4"/><rect x="45" y="70" width="4" height="4"/></g><rect x="6" y="6" width="108" height="108" rx="6" fill="url(#lt)"/></svg>`;
 const setView = (v) => { document.body.dataset.view = v; };
 
@@ -132,7 +176,7 @@ window.addEventListener('hashchange', route);
 /* ---------- landing ---------- */
 function landing() {
   const BOOT = ['[ OK ] mounting campusconnect.example', '[ OK ] intrusion detected: NULLPHANTOM', '[WARN] vault key split into 5 fragments', '[ .. ] awaiting analyst credentials'];
-  const booted = sessionStorage.getItem('dmc_boot') || reduced;
+  const booted = sessionStorage.getItem('dmc_boot') || reduced || NOFX;
   $app.innerHTML = chrome(`<span><span class="dot"></span>SYS.STATUS: ONLINE</span>`) + `<main class="lmain">
   <div class="boot ${booted ? 'done' : ''}" id="boot"></div>
   <div class="center ${booted ? 'show' : ''}" id="land">
