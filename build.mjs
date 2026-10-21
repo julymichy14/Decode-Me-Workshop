@@ -38,8 +38,11 @@ async function sha256(s) {
 
 const passcode = process.env.ADMIN_PASSCODE || rnd(8);
 const startCode = code(), vaultCode = code(), revealCode = code();
-const pub = { salt: b64(salt), teams: [], holders: {}, global: {} };
-const admin = { startCode, vaultCode, revealCode, flag: src.vault.flag, vaultPlain: src.vault.plaintext,
+// signing key pair: only the admin console can sign live messages, team pages verify them
+const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+const topic = 'dmc-' + rnd(16).toLowerCase();
+const pub = { salt: b64(salt), topic, pub: await crypto.subtle.exportKey('jwk', kp.publicKey), teams: [], holders: {}, global: {} };
+const admin = { priv: await crypto.subtle.exportKey('jwk', kp.privateKey), startCode, vaultCode, revealCode, flag: src.vault.flag, vaultPlain: src.vault.plaintext,
   vaultRecipe: src.vault.recipe, teams: {} };
 
 for (const t of src.teams) {
