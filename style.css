@@ -303,3 +303,14 @@ html.nofx *{transition:none!important;animation:none!important}
 
 .scr>div:first-child{background:#0B0E11d9;padding:.8vw 1.2vw;border:1px solid var(--bd)}
 .card:disabled b{color:#3a444e;background:#1b222a;border-radius:2px;width:70%;overflow:hidden;color:transparent;height:1.1em;margin-top:2px}
+
+.bulb{vertical-align:-3px}
+.btn.amber{background:var(--am)}
+.hkey{display:flex;flex-direction:column;gap:6px;border:1px dashed #F5B84166!important;font-size:12px}
+.hkey .prompt{padding:0;overflow:hidden;border-color:#F5B84166}
+.hkey .prompt input{padding:9px 10px;font-size:14px}
+.hkey .btn{border-radius:0;padding:9px 12px;font-size:12px}
+.hintpanel{border-color:#F5B84155}
+.hintpanel .hint.on{animation:in .5s,glowa 1.4s}
+@keyframes glowa{from{box-shadow:0 0 22px #F5B84155}}
+.hintann{border-color:var(--am)}

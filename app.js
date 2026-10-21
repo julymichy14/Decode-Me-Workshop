@@ -72,14 +72,18 @@ function scramble(el, final, ms) {
   if (reduced) { el.textContent = final; return; }
   ms = ms || Math.min(1500, 450 + final.length * 5);
   const t0 = performance.now();
-  (function f(now) {
-    const p = Math.min(1, (now - t0) / ms), n = Math.floor(p * final.length);
+  let done = false;
+  const finish = () => { done = true; el.textContent = final; };
+  (function f() {
+    if (done) return;
+    const p = Math.min(1, (performance.now() - t0) / ms), n = Math.floor(p * final.length);
+    if (p >= 1) return finish();
     let o = final.slice(0, n);
     for (let i = n; i < final.length; i++) o += /\s/.test(final[i]) ? final[i] : GLYPHS[(Math.random() * GLYPHS.length) | 0];
-    el.textContent = p < 1 ? o : final;
-    if (p < 1) requestAnimationFrame(f);
-  })(t0);
-  setTimeout(() => { el.textContent = final; }, ms + 150);
+    el.textContent = o;
+    requestAnimationFrame(f);
+  })();
+  setTimeout(finish, ms + 150);
 }
 addEventListener('pointermove', (e) => {
   document.documentElement.style.setProperty('--mx', e.clientX + 'px');
@@ -158,6 +162,7 @@ addEventListener('pointermove', (e) => {
   r.setProperty('--py', (e.clientY / innerHeight - 0.5).toFixed(3));
 });
 const SAFE = `<svg class="safe" viewBox="0 0 120 120"><defs><linearGradient id="mt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a4249"/><stop offset="1" stop-color="#14181c"/></linearGradient><radialGradient id="lt" cx=".7" cy=".1" r=".9"><stop offset="0" stop-color="#F5B841" stop-opacity=".35"/><stop offset="1" stop-color="#F5B841" stop-opacity="0"/></radialGradient></defs><rect x="6" y="6" width="108" height="108" rx="6" fill="url(#mt)" stroke="#555e66"/><rect x="16" y="16" width="88" height="88" rx="4" fill="#1b2025" stroke="#2C353F"/><circle cx="82" cy="60" r="16" fill="#101316" stroke="#7a858e" stroke-width="2"/><g stroke="#7a858e" stroke-width="2"><path d="M82 46v28M68 60h28M72 50l20 20M92 50 72 70"/></g><rect x="26" y="40" width="26" height="40" rx="2" fill="#0d1013" stroke="#2C353F"/><g fill="#A3E635" opacity=".8"><rect x="31" y="46" width="16" height="5"/></g><g fill="#56D4DD" opacity=".5"><rect x="31" y="56" width="4" height="4"/><rect x="38" y="56" width="4" height="4"/><rect x="45" y="56" width="4" height="4"/><rect x="31" y="63" width="4" height="4"/><rect x="38" y="63" width="4" height="4"/><rect x="45" y="63" width="4" height="4"/><rect x="31" y="70" width="4" height="4"/><rect x="38" y="70" width="4" height="4"/><rect x="45" y="70" width="4" height="4"/></g><rect x="6" y="6" width="108" height="108" rx="6" fill="url(#lt)"/></svg>`;
+const BULB = `<svg class="bulb" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2h5c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg>`;
 const setView = (v) => { document.body.dataset.view = v; };
 
 /* ---------- router ---------- */
@@ -218,11 +223,11 @@ async function teamView(id) {
   const blobs = { ...T.blobs, vault: D.global.vault, reveal: D.global.reveal };
   const codeKey = 'dmc_codes_' + id;
   const got = {}; // unlocked payloads
-  let sel = 1, pending = false, msg = '', animKey = '';
-  async function tryKey(key) {
+  let sel = 1, pending = false, msg = '', animKey = '', hmsg = '';
+  async function tryKey(key, only) {
     const fresh = [];
     for (const k of Object.keys(blobs)) {
-      if (got[k]) continue;
+      if (got[k] || (only && !only(k))) continue;
       const p = await open(blobs[k], key);
       if (p) { got[k] = p; fresh.push(k); }
     }
@@ -279,12 +284,13 @@ async function teamView(id) {
         <div class="kv"><span>DIFFICULTY</span><b class="diff">${[1, 2, 3, 4, 5].map((n) => `<i class="${n <= st.n ? 'on' : ''}"></i>`).join('')}</b></div>
         <div class="polaroid mini">${st.n % 2 ? HOUSE : MAP}</div></div>`;
       if (isActive) {
-        hints = `<div class="panel side"><div class="lbl">&gt; HINTS</div>`;
+        hints = `<div class="panel side hintpanel"><div class="lbl am">${BULB} HINTS</div>`;
         for (let k = 1; k <= 2; k++) {
           const h = got[`h${st.n}_${k}`];
-          hints += h ? `<div class="hint on"><span class="am mono">// HINT ${k} (−${hintCost(st.points)} PTS)</span><br>${esc(h.text)}</div>`
-            : `<div class="hint off">// HINT ${k} (−${hintCost(st.points)} PTS)<br>🔒 LOCKED · ask the admin, then enter the code below</div>`;
+          hints += h ? `<div class="hint on"><span class="am mono">${BULB} HINT ${k} (−${hintCost(st.points)} PTS)</span><br>${esc(h.text)}</div>`
+            : `<form class="hint off hkey" data-k="${k}"><span class="am mono">${BULB} HINT ${k} · LOCKED (−${hintCost(st.points)} PTS)</span><span class="dim">Ask the admin for a hint key.</span><div class="prompt"><input placeholder="HINT KEY" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn amber">REVEAL</button></div></form>`;
         }
+        if (hmsg) hints += `<div class="err">${esc(hmsg)}</div>`;
         hints += `</div>`;
       }
     }
@@ -302,6 +308,16 @@ async function teamView(id) {
       <p class="lbl">Codes unlock content on this device only. Enter them on each phone or laptop you use.</p>${below}</div>
       <div class="rcol">${info}${hints}${notes}</div></div></main>`;
     $app.querySelectorAll('.card').forEach((b) => (b.onclick = () => { sel = +b.dataset.n; render(); }));
+    $app.querySelectorAll('.hkey').forEach((f) => (f.onsubmit = async (ev) => {
+      ev.preventDefault();
+      const code = norm(f.querySelector('input').value); if (!code || pending) return;
+      pending = true;
+      const fresh = await tryKey(await keyFor(code), (k) => /^h\d_\d$/.test(k));
+      pending = false;
+      if (!fresh.length) { hmsg = 'ERR: not a valid hint key for this stage'; render(); return; }
+      hmsg = ''; const codes = ls.get(codeKey, []); codes.push(code); ls.set(codeKey, codes);
+      flash('HINT UNLOCKED'); render();
+    }));
     const nt = $app.querySelector('#notes'); if (nt) nt.oninput = () => ls.set('dmc_notes_' + id, nt.value);
     if (st) wireCopy($app, st.encoded);
     const ak = sel + ':' + (solved(sel) ? 1 : 0);
@@ -420,7 +436,7 @@ async function adminView() {
     const issued = [];
     if (S.startedAt) issued.push(['START (everyone)', A.startCode]);
     for (let n = 1; n <= Math.min(ts.stage, 6); n++) {
-      for (let k = 1; k <= (ts.hints[n] || 0); k++) issued.push([`Stage ${n} hint ${k}`, tm.stages[n - 1].hintCodes[k - 1]]);
+      for (let k = 1; k <= (ts.hints[n] || 0); k++) issued.push([`💡 Stage ${n} hint ${k} (HINT KEY)`, tm.stages[n - 1].hintCodes[k - 1]]);
       if (n < ts.stage) issued.push([`Stage ${n} verified`, tm.stages[n - 1].unlockCode]);
     }
     const issuedHtml = `<div class="gap"><div class="lbl">// CODES ISSUED TO ${esc(tm.name.toUpperCase())}</div><div class="mono" style="font-size:12px;margin-top:6px">${issued.map(([l, c]) => `${esc(l)}: <span class="am">${esc(c)}</span>`).join('<br>') || 'none yet'}</div></div>`;
@@ -438,7 +454,7 @@ async function adminView() {
       <button class="btn ghost" id="vault" ${S.vaultOpen || !started ? 'disabled' : ''}>Open the vault</button>
       <button class="btn ghost" id="reveal" ${S.revealed || !S.vaultOpen ? 'disabled' : ''}>Reveal final answer</button>
       <button class="btn danger ${armed === 'reset' ? 'arm' : ''}" id="reset">${armed === 'reset' ? 'CONFIRM RESET?' : 'Reset game'}</button></div>
-    ${S.announce ? `<div class="panel" style="padding:12px 16px;margin-bottom:16px"><span class="lbl">// READ OUT NOW · ${esc(S.announce.label)}</span><br><span class="codebox">${esc(S.announce.code)}</span></div>` : ''}
+    ${S.announce ? (S.announce.kind === 'hint' ? `<div class="panel hintann" style="padding:12px 16px;margin-bottom:16px"><span class="lbl am">${BULB} HINT KEY · ${esc(S.announce.label)}</span><br><span class="codebox">${esc(S.announce.code)}</span><span class="dim mono" style="font-size:12px"> &nbsp;give this to the team, they enter it in their Hints panel</span></div>` : `<div class="panel" style="padding:12px 16px;margin-bottom:16px"><span class="lbl">// READ OUT NOW · ${esc(S.announce.label)}</span><br><span class="codebox">${esc(S.announce.code)}</span></div>`) : ''}
     <div class="adm"><div class="panel" style="padding:8px"><table><tr><th>TEAM</th><th>STAGES</th><th>#</th><th>TIME</th><th>HINTS</th><th>SCORE</th><th>LAST</th></tr>${rows}</table>
       <div class="gap" style="padding:8px"><div class="lbl">// VAULT TRACKER</div><div class="mono" style="font-size:13px;margin-top:6px">${slots}</div>
       <div class="actions"><span class="lbl" style="align-self:center">FLAG BONUS</span>${D.teams.map((t) => `<button class="btn ghost bonus" data-t="${t.id}" ${S.bonus.includes(t.id) || S.bonus.length >= 3 ? 'disabled' : ''}>${esc(t.name.replace('Team ', ''))}</button>`).join('')}</div>
@@ -462,7 +478,7 @@ async function adminView() {
     }));
     [1, 2].forEach((k) => on('#h' + k, () => act((S) => {
       const x = S.teams[sel], n = x.stage; x.hints[n] = k; x.last = Date.now();
-      S.announce = { label: `${tm.name} · hint ${k}`, code: tm.stages[n - 1].hintCodes[k - 1] };
+      S.announce = { label: `${tm.name} · stage ${n} · hint ${k}`, code: tm.stages[n - 1].hintCodes[k - 1], kind: 'hint' };
       log(S, `${tm.name} hint ${k} on stage ${n}`);
     })));
     on('#hold', () => act((S) => { S.teams[sel].hold = !S.teams[sel].hold; log(S, `${tm.name} ${S.teams[sel].hold ? 'held' : 'resumed'}`); }));
