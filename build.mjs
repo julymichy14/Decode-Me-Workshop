@@ -1,0 +1,79 @@
+// Builds data.js from challenges.json. Run: ADMIN_PASSCODE=yourpass node build.mjs
+// Every locked stage / hint / vault message is AES-GCM encrypted with a random clearance code.
+// The host reads a code out loud after verifying a team; entering it in the browser decrypts the blob.
+import { webcrypto as crypto } from 'node:crypto';
+import fs from 'node:fs';
+
+const src = JSON.parse(fs.readFileSync(new URL('./challenges.json', import.meta.url), 'utf8'));
+const enc = new TextEncoder();
+const b64 = (u8) => Buffer.from(u8).toString('base64');
+const salt = crypto.getRandomValues(new Uint8Array(16));
+const norm = (c) => c.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+const ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const rnd = (n) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => ALPHA[b % 32]).join('');
+const code = () => rnd(4) + '-' + rnd(4);
+
+const keyCache = new Map();
+async function key(c) {
+  c = norm(c);
+  if (!keyCache.has(c)) {
+    const base = await crypto.subtle.importKey('raw', enc.encode(c), 'PBKDF2', false, ['deriveKey']);
+    keyCache.set(c, await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, base,
+      { name: 'AES-GCM', length: 256 }, false, ['encrypt']));
+  }
+  return keyCache.get(c);
+}
+async function seal(obj, c) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await key(c), enc.encode(JSON.stringify(obj))));
+  const out = new Uint8Array(12 + ct.length);
+  out.set(iv); out.set(ct, 12);
+  return b64(out);
+}
+async function sha256(s) {
+  return Buffer.from(await crypto.subtle.digest('SHA-256', enc.encode(s))).toString('hex');
+}
+
+const passcode = process.env.ADMIN_PASSCODE || rnd(8);
+const startCode = code(), vaultCode = code(), revealCode = code();
+const pub = { salt: b64(salt), teams: [], holders: {}, global: {} };
+const admin = { startCode, vaultCode, revealCode, flag: src.vault.flag, vaultPlain: src.vault.plaintext,
+  vaultRecipe: src.vault.recipe, teams: {} };
+
+for (const t of src.teams) {
+  const joinCode = t.id.toUpperCase() + '-' + rnd(3);
+  const blobs = {};
+  const at = { name: t.name, joinCode, fragment_position: t.fragment_position, stages: [] };
+  const codes = t.stages.map(() => code());
+  for (const s of t.stages) {
+    const p = { n: s.n, title: s.title, file: s.file, points: s.points, layers: s.layers, encoded: s.encoded };
+    if (s.evidence_extra) p.evidence_extra = s.evidence_extra;
+    if (s.n === 1) { p.system = t.system; p.host = t.host; }
+    const prev = s.n > 1 ? t.stages[s.n - 2] : null;
+    if (prev) p.prev = { decoded: prev.decoded, recipe: prev.recipe };
+    blobs['s' + s.n] = await seal(p, s.n === 1 ? startCode : codes[s.n - 2]);
+    const hc = [code(), code()];
+    for (let k = 0; k < 2; k++) blobs[`h${s.n}_${k + 1}`] = await seal({ text: s.hints[k] }, hc[k]);
+    at.stages.push({ n: s.n, title: s.title, file: s.file, points: s.points, encoded: s.encoded, decoded: s.decoded,
+      recipe: s.recipe, answer: s.answer, hints: s.hints, hintCodes: hc,
+      unlockCode: codes[s.n - 1] }); // read out after verifying this stage
+  }
+  blobs.done = await seal({
+    prev: { decoded: t.stages[4].decoded, recipe: t.stages[4].recipe },
+    fragment: t.fragment, fragment_position: t.fragment_position,
+    step: t.vault_recipe_step, label: t.vault_recipe_label,
+  }, codes[4]);
+  admin.teams[t.id] = at;
+  pub.holders[t.fragment_position] = t.name;
+  pub.teams.push({ id: t.id, name: t.name, joinHash: await sha256(norm(joinCode)), blobs });
+}
+pub.global.vault = await seal({ open: true }, vaultCode);
+pub.global.reveal = await seal({ plaintext: src.vault.plaintext, flag: src.vault.flag }, revealCode);
+pub.admin = await seal(admin, passcode);
+pub.adminCheckSalt = undefined;
+
+fs.writeFileSync(new URL('./data.js', import.meta.url), 'window.DATA = ' + JSON.stringify(pub) + ';\n');
+console.log('data.js written.');
+console.log('ADMIN PASSCODE:', passcode, process.env.ADMIN_PASSCODE ? '' : '(random; set ADMIN_PASSCODE to choose)');
