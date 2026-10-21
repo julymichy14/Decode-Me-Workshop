@@ -46,7 +46,7 @@ function copyText(t, btn) {
   function fallback() { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); done(); }
 }
 const nav = (p) => { location.hash = '#' + p; };
-const chrome = (right) => `<div class="bar"><span class="mono grn">&gt;_</span><b>DECODE ME IF YOU CAN</b><span class="sp"></span>${right || ''}</div>`;
+const chrome = (right) => `<div class="bar"><span class="mono grn logo">&gt;_</span><b class="glitch" data-t="DECODE ME IF YOU CAN">DECODE ME IF YOU CAN</b><span class="tick mono dim">VAULT SEALED</span><span class="sp"></span>${right || ''}</div>`;
 function termBox(fn, lines, raw) {
   return `<div class="term"><div class="th"><i style="background:#F07178"></i><i style="background:#F5B841"></i><i style="background:#A3E635"></i><span class="fn">${esc(fn)}</span><button class="copy" data-copy>COPY</button></div>
   <div class="cmd"><span class="p">$</span> cat ${esc(fn.split('/').pop())}</div>
@@ -64,6 +64,37 @@ setInterval(() => {
   });
 }, 1000);
 
+
+/* ---------- motion helpers ---------- */
+const GLYPHS = '01ABCDEF▓▒░<>/\\#$%&*';
+function scramble(el, final, ms) {
+  if (reduced) { el.textContent = final; return; }
+  ms = ms || Math.min(1500, 450 + final.length * 5);
+  const t0 = performance.now();
+  (function f(now) {
+    const p = Math.min(1, (now - t0) / ms), n = Math.floor(p * final.length);
+    let o = final.slice(0, n);
+    for (let i = n; i < final.length; i++) o += /\s/.test(final[i]) ? final[i] : GLYPHS[(Math.random() * GLYPHS.length) | 0];
+    el.textContent = p < 1 ? o : final;
+    if (p < 1) requestAnimationFrame(f);
+  })(t0);
+}
+addEventListener('pointermove', (e) => {
+  document.documentElement.style.setProperty('--mx', e.clientX + 'px');
+  document.documentElement.style.setProperty('--my', e.clientY + 'px');
+});
+const TICKS = ['TRACING 192.0.2.44 …', 'NULLPHANTOM LAST SEEN 23:41', 'FRAGMENTS RECOVERED: ?/5', 'INTEGRITY CHECK … OK', 'LISTENING ON :443', 'CASE FILE #0412 OPEN', 'VAULT SEALED'];
+let tickI = 0;
+setInterval(() => {
+  const m = TICKS[++tickI % TICKS.length];
+  document.querySelectorAll('.tick').forEach((e) => scramble(e, m, 500));
+}, 3000);
+const FEED = ['GET /admin/notes?data=… 200', 'badge 0412 cloned', 'POST /admin/create_user 201', 'stash@{0} pushed', 'DROP TABLE sessions; (blocked)', 'door 7 opened 23:41:02', 'mail drafts/unsent_0412.eml saved', 'cam04 offline 3m12s', 'git commit 9f2c1a amended', 'backup.tar.gz read 4.2MB', 'login failed phantom_admin x3', 'cron: rotate /var/log/nginx'];
+const feedLine = () => {
+  const d = new Date(), t = d.toTimeString().slice(0, 8), ip = '192.0.2.' + (((Math.random() * 90) | 0) + 10);
+  return `${t}  ${ip.padEnd(11)}  ${FEED[(Math.random() * FEED.length) | 0]}`;
+};
+
 /* ---------- router ---------- */
 let teardown = null;
 function route() {
@@ -78,23 +109,46 @@ window.addEventListener('hashchange', route);
 
 /* ---------- landing ---------- */
 function landing() {
+  const BOOT = ['[ OK ] mounting campusconnect.example', '[ OK ] intrusion detected: NULLPHANTOM', '[WARN] vault key split into 5 fragments', '[ OK ] 5 compromised systems isolated', '[ .. ] awaiting analyst credentials'];
+  const booted = sessionStorage.getItem('dmc_boot') || reduced;
   $app.innerHTML = chrome(`<span><span class="dot"></span>SYS.STATUS: ONLINE</span>`) + `<main>
-  <div class="hero"><div class="lbl">// ACCESS LEVEL: RESTRICTED</div>
-  <h1>The intruder left<br>the key in <span>five pieces.</span></h1>
+  <div class="boot ${booted ? 'done' : ''}" id="boot"></div>
+  <div class="land ${booted ? 'show' : ''}" id="land">
+  <div class="hero"><div class="lbl">// CASE_0412 · ACCESS LEVEL: RESTRICTED</div>
+  <h1>The intruder left<br>the key in <span class="hl" id="hl">five pieces.</span></h1>
   <p>NullPhantom broke into the CampusConnect student portal and hid a vault key across five compromised systems. Your team investigates one. Decode every layer in <a href="https://gchq.github.io/CyberChef/" target="_blank" rel="noopener">CyberChef</a>, bring the code word to the admin, and unlock the next file. The vault only opens when all five teams work together.</p>
   <div class="lbl" style="margin:26px 0 8px">// ENTER TEAM CODE</div>
-  <form class="prompt" id="f"><span class="grn">&gt;</span><input id="c" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ALPHA-XXX" autofocus><button class="btn">EXECUTE</button></form>
+  <form class="prompt" id="f"><span class="grn">&gt;</span><input id="c" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ALPHA-XXX"><button class="btn">EXECUTE</button></form>
   <div class="err" id="e"></div>
-  <p class="lbl">Admin? <a href="#/admin">/admin</a> &nbsp; Projector? <a href="#/screen">/screen</a></p></div></main>`;
-  const saved = ls.get('dmc_team');
-  if (saved && D.teams.some((t) => t.id === saved)) {
-    $app.querySelector('#e').innerHTML = `<a href="#/team/${esc(saved)}">&gt; resume session as ${esc(saved.toUpperCase())}</a>`;
+  <p class="lbl">Admin? <a href="#/admin">/admin</a> &nbsp; Projector? <a href="#/screen">/screen</a></p></div>
+  <aside class="side"><div class="term"><div class="th"><i style="background:#F07178"></i><i style="background:#F5B841"></i><i style="background:#A3E635"></i><span class="fn">tail -f /var/log/intrusion.log</span></div>
+  <div class="tb feed" id="feed" style="counter-reset:none"></div></div>
+  <div class="vaultviz mono" id="vz"></div></aside></div></main>`;
+  const $ = (q) => $app.querySelector(q);
+  const hl = $('#hl'), hlText = hl.textContent;
+  const show = () => { $('#land').classList.add('show'); $('#boot').classList.add('done'); scramble(hl, hlText, 1100); hl.onmouseenter = () => scramble(hl, hlText, 600); };
+  let timers = [];
+  if (booted) { hl.onmouseenter = () => scramble(hl, hlText, 600); }
+  else {
+    sessionStorage.setItem('dmc_boot', '1');
+    const boot = $('#boot'); let i = 0;
+    const step = () => { if (i < BOOT.length) { boot.insertAdjacentHTML('beforeend', `<div class="${/WARN/.test(BOOT[i]) ? 'am' : ''}">${esc(BOOT[i++])}</div>`); timers.push(setTimeout(step, 260)); } else timers.push(setTimeout(show, 350)); };
+    step(); boot.onclick = () => { timers.forEach(clearTimeout); show(); };
   }
-  $app.querySelector('#f').onsubmit = async (ev) => {
+  const feed = $('#feed');
+  for (let i = 0; i < 8; i++) feed.insertAdjacentHTML('beforeend', `<div class="fl">${esc(feedLine())}</div>`);
+  const fi = setInterval(() => { feed.insertAdjacentHTML('beforeend', `<div class="fl">${esc(feedLine())}</div>`); if (feed.children.length > 10) feed.firstChild.remove(); }, 1300);
+  let lit = 0; const vz = $('#vz');
+  const drawV = () => { vz.innerHTML = '<span class="lbl">// VAULT_STATE</span><br>' + [0, 1, 2, 3, 4].map((k) => `<span class="vs ${k === lit % 5 ? 'on' : ''}">[${k === lit % 5 ? '▒' : '?'}]</span>`).join(' ') + '<br><span class="dim">0 / 5 fragments recovered</span>'; };
+  drawV(); const vi = setInterval(() => { lit++; drawV(); }, 1100);
+  teardown = () => { clearInterval(fi); clearInterval(vi); timers.forEach(clearTimeout); };
+  const saved = ls.get('dmc_team');
+  if (saved && D.teams.some((t) => t.id === saved)) $('#e').innerHTML = `<a href="#/team/${esc(saved)}">&gt; resume session as ${esc(saved.toUpperCase())}</a>`;
+  $('#f').onsubmit = async (ev) => {
     ev.preventDefault();
-    const h = await sha256hex(norm($app.querySelector('#c').value));
+    const h = await sha256hex(norm($('#c').value));
     const t = D.teams.find((x) => x.joinHash === h);
-    if (!t) { $app.querySelector('#e').textContent = 'ERR: unknown team code'; return; }
+    if (!t) { $('#e').textContent = 'ERR: unknown team code'; $('#f').classList.remove('shake'); void $('#f').offsetWidth; $('#f').classList.add('shake'); return; }
     ls.set('dmc_team', t.id); nav('/team/' + t.id);
   };
 }
@@ -106,7 +160,7 @@ async function teamView(id) {
   const blobs = { ...T.blobs, vault: D.global.vault, reveal: D.global.reveal };
   const codeKey = 'dmc_codes_' + id;
   const got = {}; // unlocked payloads
-  let sel = 1, pending = false, msg = '';
+  let sel = 1, pending = false, msg = '', animKey = '';
   async function tryKey(key) {
     const fresh = [];
     for (const k of Object.keys(blobs)) {
@@ -131,7 +185,7 @@ async function teamView(id) {
     let tree = '<div class="hd lbl">▾ INVESTIGATION</div>';
     for (let n = 1; n <= 5; n++) {
       const [lab, cls] = status(n), opened = !!got['s' + n];
-      tree += `<button data-n="${n}" class="${n === c && !solved(n) ? 'act ' : ''}${n === sel ? 'sel' : ''}" ${opened ? '' : 'disabled'}>
+      tree += `<button style="--i:${n}" data-n="${n}" class="${n === c && !solved(n) ? 'act ' : ''}${n === sel ? 'sel' : ''}" ${opened ? '' : 'disabled'}>
         <span class="dim">${n === 5 ? '└──' : '├──'}</span><span>${opened ? esc(got['s' + n].file.split('/').pop()) : String(n).padStart(2, '0') + '_██████'}</span>
         <span class="st ${cls}">${opened ? lab : '🔒'}</span></button>`;
     }
@@ -173,12 +227,19 @@ async function teamView(id) {
     if (got.vault) side += vaultPanel();
     if (got.reveal) side += revealPanel();
     $app.innerHTML = chrome(`<span class="mono">${esc(T.name.toUpperCase())}</span><span class="mono dim">${s1 ? esc(s1.host) : '—'}</span>
-      <span class="mono">STAGE ${Math.max(c, 1)}/5</span><span class="mono grn">SCORE ${score()}</span><span><span class="dot"></span><span class="mono dim">LOCAL</span></span><a class="mono" href="#/" id="out">EXIT</a>`) +
+      <span class="mono"><span class="grn">[${[1, 2, 3, 4, 5].map((n) => (solved(n) ? '■' : n === c ? '▒' : '□')).join('')}]</span> ${Math.max(c, 1)}/5</span><span class="mono grn">SCORE ${score()}</span><span><span class="dot"></span><span class="mono dim">LOCAL</span></span><a class="mono" href="#/" id="out">EXIT</a>`) +
       `<main>${msg ? '' : ''}<div class="ws"><div class="panel tree">${tree}</div><div><div class="panel">${main}</div>${side}
       <form class="unlock" id="uf"><span class="lbl">// CLEARANCE CODE FROM ADMIN</span><div class="prompt" style="max-width:300px"><span class="grn">&gt;</span><input id="uc" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX"><button class="btn">UNLOCK</button></div><span class="err" id="ue">${esc(msg)}</span></form>
       <p class="lbl">Codes unlock content on this device only. Enter them on each phone or laptop you use.</p></div></div></main>`;
     $app.querySelectorAll('.tree button').forEach((b) => (b.onclick = () => { sel = +b.dataset.n; render(); }));
     if (st) wireCopy($app, st.encoded);
+    const ak = sel + ':' + (solved(sel) ? 1 : 0);
+    if (st && ak !== animKey) {
+      animKey = ak;
+      const pn = $app.querySelector('.ws .panel:not(.tree)'); if (pn) pn.classList.add('open');
+      const ttl = $app.querySelector('h2.t'); if (ttl) scramble(ttl, st.title, 600);
+      $app.querySelectorAll('.term .ln span').forEach((e, i) => { const f = e.textContent; setTimeout(() => scramble(e, f), i * 120); });
+    }
     $app.querySelectorAll('[data-copy2]').forEach((b) => (b.onclick = () => copyText(got.done.fragment, b)));
     $app.querySelector('#out').onclick = () => localStorage.removeItem('dmc_team');
     $app.querySelector('#uf').onsubmit = async (ev) => {
