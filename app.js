@@ -15,10 +15,19 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // a rebuilt data.js is a new game: forget every team session, entered code, note and admin state
 try {
   if (localStorage.getItem('dmc_build') !== D.salt) {
-    Object.keys(localStorage).filter((k) => /^dmc_(team|codes_|notes_|admin)/.test(k)).forEach((k) => localStorage.removeItem(k));
+    Object.keys(localStorage).filter((k) => /^dmc_(team|codes_|notes_|admin|names)/.test(k)).forEach((k) => localStorage.removeItem(k));
     localStorage.setItem('dmc_build', D.salt);
   }
 } catch {}
+// teams can be renamed from the admin console: the override lives in localStorage and is also sent live
+const BASE_HOLDER_IDS = {};
+for (const p in D.holders) { const t = D.teams.find((x) => x.name === D.holders[p]); if (t) BASE_HOLDER_IDS[p] = t.id; }
+function applyNames(map) {
+  map = map || {};
+  for (const t of D.teams) if (map[t.id] && String(map[t.id]).trim()) t.name = String(map[t.id]).trim().slice(0, 24);
+  for (const p in BASE_HOLDER_IDS) D.holders[p] = D.teams.find((t) => t.id === BASE_HOLDER_IDS[p]).name;
+}
+applyNames(ls.get('dmc_names', {}));
 
 /* ---------- crypto ---------- */
 const keyCache = new Map();
@@ -207,6 +216,11 @@ addEventListener('pointermove', (e) => {
 });
 const SAFE = `<svg class="safe" viewBox="0 0 120 120"><defs><linearGradient id="mt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a4249"/><stop offset="1" stop-color="#14181c"/></linearGradient><radialGradient id="lt" cx=".7" cy=".1" r=".9"><stop offset="0" stop-color="#F5B841" stop-opacity=".35"/><stop offset="1" stop-color="#F5B841" stop-opacity="0"/></radialGradient></defs><rect x="6" y="6" width="108" height="108" rx="6" fill="url(#mt)" stroke="#555e66"/><rect x="16" y="16" width="88" height="88" rx="4" fill="#1b2025" stroke="#2C353F"/><circle cx="82" cy="60" r="16" fill="#101316" stroke="#7a858e" stroke-width="2"/><g stroke="#7a858e" stroke-width="2"><path d="M82 46v28M68 60h28M72 50l20 20M92 50 72 70"/></g><rect x="26" y="40" width="26" height="40" rx="2" fill="#0d1013" stroke="#2C353F"/><g fill="#A3E635" opacity=".8"><rect x="31" y="46" width="16" height="5"/></g><g fill="#56D4DD" opacity=".5"><rect x="31" y="56" width="4" height="4"/><rect x="38" y="56" width="4" height="4"/><rect x="45" y="56" width="4" height="4"/><rect x="31" y="63" width="4" height="4"/><rect x="38" y="63" width="4" height="4"/><rect x="45" y="63" width="4" height="4"/><rect x="31" y="70" width="4" height="4"/><rect x="38" y="70" width="4" height="4"/><rect x="45" y="70" width="4" height="4"/></g><rect x="6" y="6" width="108" height="108" rx="6" fill="url(#lt)"/></svg>`;
 const BULB = `<svg class="bulb" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2h5c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg>`;
+const SAFE_BIG = `<svg class="safebig" viewBox="0 0 200 180"><defs><linearGradient id="mt2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4a535b"/><stop offset="1" stop-color="#161a1e"/></linearGradient><radialGradient id="in2" cx=".5" cy=".5" r=".7"><stop offset="0" stop-color="#A3E635" stop-opacity=".75"/><stop offset="1" stop-color="#0a0d0f"/></radialGradient></defs>
+<rect x="10" y="8" width="180" height="164" rx="8" fill="url(#mt2)" stroke="#6a747d" stroke-width="2"/><rect x="24" y="22" width="152" height="136" rx="4" class="cavity" fill="#050708"/><rect x="24" y="22" width="152" height="136" rx="4" class="glow" fill="url(#in2)"/>
+<g class="door"><rect x="24" y="22" width="152" height="136" rx="4" fill="#20262b" stroke="#7a858e" stroke-width="2"/><rect x="34" y="32" width="132" height="116" rx="3" fill="none" stroke="#38424a"/>
+<g class="dial"><circle cx="118" cy="90" r="30" fill="#12161a" stroke="#8a959e" stroke-width="3"/><circle cx="118" cy="90" r="22" fill="none" stroke="#4a545c" stroke-dasharray="3 5" stroke-width="5"/><path d="M118 62v56M90 90h56M98 70l40 40M138 70 98 110" stroke="#a7b1b9" stroke-width="3" stroke-linecap="round"/><circle cx="118" cy="90" r="6" fill="#A3E635"/></g>
+<rect x="46" y="64" width="34" height="52" rx="3" fill="#0b0e11" stroke="#38424a"/><rect x="52" y="71" width="22" height="7" fill="#A3E635" opacity=".85"/><g fill="#56D4DD" opacity=".55"><rect x="52" y="86" width="5" height="5"/><rect x="61" y="86" width="5" height="5"/><rect x="70" y="86" width="5" height="5"/><rect x="52" y="95" width="5" height="5"/><rect x="61" y="95" width="5" height="5"/><rect x="70" y="95" width="5" height="5"/><rect x="52" y="104" width="5" height="5"/><rect x="61" y="104" width="5" height="5"/><rect x="70" y="104" width="5" height="5"/></g></g></svg>`;
 const setView = (v) => { document.body.dataset.view = v; };
 
 /* ---------- router ---------- */
@@ -267,7 +281,7 @@ async function teamView(id) {
   const blobs = { ...T.blobs, vault: D.global.vault, reveal: D.global.reveal };
   const codeKey = 'dmc_codes_' + id;
   const got = {}; // unlocked payloads
-  let sel = 1, pending = false, msg = '', animKey = '', hmsg = '', restartCode = '', liveOk = false, bcast = null;
+  let sel = 1, pending = false, msg = '', animKey = '', hmsg = '', restartCode = '', liveOk = false, bcast = null, brief = null;
   async function tryKey(key, only) {
     const fresh = [];
     for (const k of Object.keys(blobs)) {
@@ -289,16 +303,17 @@ async function teamView(id) {
     return Math.max(0, s); };
   const recap = (n) => (n < 5 ? got['s' + (n + 1)] : got.done).prev;
 
-  const wipe = () => { Object.keys(got).forEach((k) => delete got[k]); ls.set(codeKey, []); localStorage.removeItem('dmc_notes_' + id); sel = 1; hmsg = ''; msg = ''; restartCode = ''; bcast = null; };
+  const wipe = () => { Object.keys(got).forEach((k) => delete got[k]); ls.set(codeKey, []); localStorage.removeItem('dmc_notes_' + id); sel = 1; hmsg = ''; msg = ''; restartCode = ''; bcast = null; brief = null; };
   function afterUnlock(fresh) {
     const stg = fresh.filter((k) => /^s\d$/.test(k)).map((k) => +k[1]);
-    if (fresh.includes('done')) sel = 5; else if (stg.length) sel = Math.max(...stg);
+    if (fresh.includes('done')) { sel = 5; brief = { n: 6 }; } else if (stg.length) { sel = Math.max(...stg); brief = { n: sel }; }
     if (fresh.some((k) => /^s\d$|^done$|^vault$|^reveal$/.test(k))) flash(fresh.includes('reveal') ? 'CASE CLOSED' : 'ACCESS GRANTED');
     else if (fresh.some((k) => /^h\d_\d$/.test(k))) flash('HINT UNLOCKED');
     render();
   }
   async function onLive(b) {
     const myE = ls.get('dmc_epoch', 0);
+    if (b.t === 'names') { ls.set('dmc_names', b.names || {}); applyNames(b.names); render(); return; }
     if (b.t === 'reset') { if (b.epoch > myE) { ls.set('dmc_epoch', b.epoch); wipe(); render(); flash('NEW ROUND'); } return; }
     if (b.epoch < myE) return;
     if (b.epoch > myE) ls.set('dmc_epoch', b.epoch);
@@ -326,7 +341,7 @@ async function teamView(id) {
       main = `<div class="tabs"><div class="on">${esc(st.file)}</div></div><div class="body">
         <div class="lbl">// CHALLENGE_${String(st.n).padStart(3, '0')} ${solved(sel) ? '· DECRYPTED' : ''}</div>
         <h2 class="t">${esc(st.title.toUpperCase())}</h2>
-        <div class="mission">Evidence recovered from <b>${esc(s1.host)}</b>. ${st.layers} layer${st.layers > 1 ? 's' : ''} of encoding. Decode it in <a href="https://gchq.github.io/CyberChef/" target="_blank" rel="noopener">CyberChef</a>, then bring the code word to the admin.</div>
+        <div class="mission">Evidence recovered from <b>${esc(s1.host)}</b>. Work out how it is encoded, decode it in <a href="https://gchq.github.io/CyberChef/" target="_blank" rel="noopener">CyberChef</a>, then bring the code word to the admin.</div>
         ${termBox(st.file, lines)}`;
       if (isActive) main += `<div class="wait">AWAITING VERIFICATION — bring your code word to the admin.<span class="cur"></span></div>`;
       else if (solved(sel)) {
@@ -342,8 +357,7 @@ async function teamView(id) {
       }
       main += `</div>`;
       info = `<div class="panel side"><div class="lbl">// CHALLENGE INFO</div>
-        <div class="kv"><span>POINTS</span><b class="grn">${st.points}</b></div><div class="kv"><span>LAYERS</span><b>${st.layers}</b></div>
-        <div class="kv"><span>HINTS USED</span><b>${hintsOn(st.n)}</b></div><div class="kv"><span>FILE TYPE</span><b>.${esc(st.file.split('.').pop())}</b></div>
+        <div class="kv"><span>POINTS</span><b class="grn">${st.points}</b></div>        <div class="kv"><span>HINTS USED</span><b>${hintsOn(st.n)}</b></div><div class="kv"><span>FILE TYPE</span><b>.${esc(st.file.split('.').pop())}</b></div>
         <div class="kv"><span>DIFFICULTY</span><b class="diff">${[1, 2, 3, 4, 5].map((n) => `<i class="${n <= st.n ? 'on' : ''}"></i>`).join('')}</b></div>
         <div class="polaroid mini">${st.n % 2 ? HOUSE : MAP}</div></div>`;
       if (isActive) {
@@ -356,6 +370,29 @@ async function teamView(id) {
         if (hmsg) hints += `<div class="err">${esc(hmsg)}</div>`;
         hints += `</div>`;
       }
+    }
+    if (st && brief && ((brief.n === 6 && sel === 5) || brief.n === sel)) {
+      let head, lines, btn;
+      if (brief.n === 6) {
+        const d = got.done;
+        head = 'FILE RECOVERED';
+        lines = ['You found it, analyst.', `This is vault fragment ${d.fragment_position} of 5, and you also hold recipe step ${d.step} of 5.`, 'NullPhantom split the key so that no single team can open the vault.', 'The other four fragments are held by the other teams. Find them.'];
+        btn = 'VIEW MY FRAGMENT →';
+      } else if (brief.n === 1) {
+        head = 'MISSION BRIEFING';
+        lines = ['23:41. Someone broke into the CampusConnect student portal.', 'The intruder calls themself NullPhantom.', 'They split the key to their vault into five pieces and hid one piece in each compromised system.', `Your team has access to the ${s1.system} (${s1.host}).`, 'Every file is wrapped in encoding. Peel it apart in CyberChef until a code word appears, then bring that word to the admin.'];
+        btn = `OPEN FILE 01 → ${st.file}`;
+      } else {
+        const r = recap(brief.n - 1);
+        head = 'INTERCEPTED TRANSMISSION · NULLPHANTOM';
+        lines = r.decoded.split(/(?<=[.!?])\s+/).filter((t) => t && !/^code word/i.test(t));
+        btn = `OPEN NEXT FILE → ${st.file}`;
+      }
+      const clue = /shift|wrapper|stack|backwards|equals|costume|numbers|letter swap|old friend|next/i;
+      main = `<div class="body brief"><div class="grant">✓ ACCESS GRANTED</div><div class="lbl">// ${head}</div>
+        <div class="story">${lines.map((t, i) => `<p class="${clue.test(t) && brief.n > 1 && brief.n < 6 ? 'clue' : ''}" style="animation-delay:${(i * 0.8).toFixed(1)}s">${esc(t)}</p>`).join('')}</div>
+        <button class="btn big" id="open" style="animation-delay:${(lines.length * 0.8 + 0.2).toFixed(1)}s">${esc(btn)}</button></div>`;
+      info = ''; hints = '';
     }
     const notes = `<div class="panel side"><div class="lbl">// TEAM NOTES</div><textarea class="f notes" id="notes" placeholder="recipes, guesses, who holds what…">${esc(ls.get('dmc_notes_' + id, ''))}</textarea></div>`;
     let below = '';
@@ -371,6 +408,7 @@ async function teamView(id) {
       <p class="lbl">Codes unlock content on this device only. Enter them on each phone or laptop you use.</p>${below}</div>
       <div class="rcol">${info}${hints}${notes}</div></div></main>`;
     $app.querySelectorAll('.card').forEach((b) => (b.onclick = () => { sel = +b.dataset.n; render(); }));
+    const ob = $app.querySelector('#open'); if (ob) ob.onclick = () => { brief = null; animKey = ''; render(); };
     $app.querySelectorAll('.hkey').forEach((f) => (f.onsubmit = async (ev) => {
       ev.preventDefault();
       const code = norm(f.querySelector('input').value); if (!code || pending) return;
@@ -410,7 +448,12 @@ async function teamView(id) {
       }
       const fresh = await tryKey(key);
       pending = false;
-      if (!fresh.length) { msg = 'ERR: code rejected'; render(); return; }
+      if (!fresh.length) {
+        let known = false;
+        for (const k of Object.keys(blobs)) if (!known && await open(blobs[k], key)) known = true;
+        msg = known ? 'That code is already unlocked on this device.' : 'ERR: code rejected';
+        render(); return;
+      }
       msg = '';
       const codes = ls.get(codeKey, []); codes.push(code); ls.set(codeKey, codes);
       afterUnlock(fresh);
@@ -478,6 +521,8 @@ async function adminView() {
     return;
   }
   const priv = await crypto.subtle.importKey('jwk', A.priv, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+  const syncA = () => D.teams.forEach((t) => { A.teams[t.id].name = t.name; });
+  syncA();
   let sel = D.teams[0].id, armed = null, typed = '', resetNote = false, liveMsg = 'LIVE: idle';
   const epoch = () => ls.get('dmc_admin_epoch', 1);
   const pub = (o) => livePublish(priv, { ...o, epoch: epoch() }).then((ok) => (liveMsg = ok ? 'LIVE: sent ' + new Date().toTimeString().slice(0, 8) : 'LIVE: send failed'), () => (liveMsg = 'LIVE: offline, read codes out loud')).then(() => { const e = document.getElementById('alive'); if (e) e.textContent = liveMsg; });
@@ -540,7 +585,8 @@ async function adminView() {
     <div class="adm"><div class="panel" style="padding:8px"><table><tr><th>TEAM</th><th>STAGES</th><th>#</th><th>TIME</th><th>HINTS</th><th>SCORE</th><th>LAST</th></tr>${rows}</table>
       <div class="gap" style="padding:8px"><div class="lbl">// VAULT TRACKER</div><div class="mono" style="font-size:13px;margin-top:6px">${slots}</div>
       <div class="actions"><span class="lbl" style="align-self:center">FLAG BONUS</span>${D.teams.map((t) => `<button class="btn ghost bonus" data-t="${t.id}" ${S.bonus.includes(t.id) || S.bonus.length >= 3 ? 'disabled' : ''}>${esc(t.name.replace('Team ', ''))}</button>`).join('')}</div>
-      <div class="lbl" style="margin-top:10px">JOIN CODES</div><div class="mono" style="font-size:12px">${joins}</div></div></div>
+      <div class="lbl" style="margin-top:10px">JOIN CODES</div><div class="mono" style="font-size:12px">${joins}</div>
+      <div class="lbl" style="margin-top:14px">TEAM NAMES</div><form id="nf" class="actions">${D.teams.map((t) => `<input class="f nm" data-id="${t.id}" value="${esc(t.name)}" maxlength="24" style="width:140px">`).join('')}<button class="btn ghost">Save names</button></form></div></div>
     <div class="panel" style="padding:16px"><div class="lbl">// SELECTED: ${esc(tm.name)}</div>${detail}${issuedHtml}</div></div>
     <div class="gap panel" style="padding:12px"><div class="lbl">// EVENT LOG</div><div class="log">${S.events.map((e) => `<div>${new Date(e.t).toLocaleTimeString()}  ${esc(e.text)}</div>`).join('') || 'no events'}</div></div></main>`;
 
@@ -548,8 +594,13 @@ async function adminView() {
     $app.querySelectorAll('tr.row').forEach((r) => (r.onclick = () => { sel = r.dataset.t; typed = ''; render(); }));
     const said = $('#said'); if (said) said.oninput = () => { typed = said.value; const ok = norm(typed) && norm(typed) === norm(st.answer); $('#match').textContent = norm(typed) ? (ok ? 'MATCH' : 'NO MATCH') : ''; $('#match').className = 'mono ' + (ok ? 'grn' : 'red'); };
     on('#start', () => act((S) => {
-      resetNote = false; S.startedAt = Date.now(); for (const id in S.teams) Object.assign(S.teams[id], { stage: 1, stageStart: Date.now(), last: Date.now() }); S.announce = { label: 'START CODE (all teams)', code: A.startCode }; log(S, 'Game started'); }));
+      resetNote = false; if (ls.get('dmc_names')) pub({ t: 'names', names: ls.get('dmc_names') }); S.startedAt = Date.now(); for (const id in S.teams) Object.assign(S.teams[id], { stage: 1, stageStart: Date.now(), last: Date.now() }); S.announce = { label: 'START CODE (all teams)', code: A.startCode }; log(S, 'Game started'); }));
     on('#pause', () => act((S) => { if (S.pausedAt) { S.pausedTotal += Date.now() - S.pausedAt; S.pausedAt = null; log(S, 'Resumed'); } else { S.pausedAt = Date.now(); log(S, 'Paused'); } }));
+    const nf = $('#nf'); if (nf) nf.onsubmit = (ev) => {
+      ev.preventDefault();
+      const map = {}; nf.querySelectorAll('.nm').forEach((i) => { if (i.value.trim()) map[i.dataset.id] = i.value.trim(); });
+      ls.set('dmc_names', map); applyNames(map); syncA(); pub({ t: 'names', names: map }); render();
+    };
     on('#bcb', () => { const v = $('#bc').value.trim(); if (v) { pub({ t: 'bcast', text: v }); act((S) => { S.broadcast = { text: v, t: Date.now() }; log(S, 'Broadcast: ' + v); }); } });
     on('#vault', () => act((S) => { S.vaultOpen = true; S.announce = { label: 'VAULT CODE (all teams)', code: A.vaultCode }; log(S, 'Vault opened'); }));
     on('#reveal', () => act((S) => { S.revealed = { plaintext: A.vaultPlain, flag: A.flag, t: Date.now() }; S.announce = { label: 'REVEAL CODE (all teams)', code: A.revealCode }; log(S, 'Final answer revealed'); }));
@@ -579,28 +630,34 @@ async function adminView() {
 
 /* ---------- projector ---------- */
 function screenView() {
-  let typedFor = 0, typer = null;
+  let typedFor = 0, typer = null, full = false;
   function render() {
+    applyNames(ls.get('dmc_names', {}));
     const S = loadS(), started = !!S.startedAt;
     const clock = started ? fmt((S.pausedAt || Date.now()) - S.startedAt - S.pausedTotal) : '--:--';
     const rank = D.teams.map((t) => ({ t, x: S.teams[t.id], sc: scoreOnly(S, t.id) }));
     rank.sort((a, b) => b.sc - a.sc || (a.x.verifiedAt.slice(-1)[0] || Infinity) - (b.x.verifiedAt.slice(-1)[0] || Infinity));
     const rows = rank.map(({ t, x, sc }) => `<div class="trow"><div>${esc(t.name.toUpperCase())}</div><div class="cells">${[1, 2, 3, 4, 5].map((n) => `<div class="cell ${x.stage > n ? 'd' : x.stage === n ? 'a' : ''}">${x.stage > n ? '✓' : x.stage === n ? '●' : '🔒'}</div>`).join('')}</div><div class="score">${sc}</div></div>`).join('');
-    const slots = [1, 2, 3, 4, 5].map((p) => {
-      const t = D.teams.find((x) => x.name === D.holders[p]), on = t && S.teams[t.id].stage === 6;
-      return `<div class="slot ${on ? 'on' : ''}">SLOT_0${p}<br>▸ ${on ? 'HELD BY ' + esc(t.name.replace('Team ', '').toUpperCase()) : '[ REDACTED ]'}</div>`;
-    }).join('');
-    $app.innerHTML = `<div class="scr"><div style="display:flex;justify-content:space-between;align-items:baseline"><h1>&gt;_ DECODE ME IF YOU CAN</h1><div class="clock">${clock}${S.pausedAt ? ' · PAUSED' : ''}</div></div>
+    const held = [1, 2, 3, 4, 5].map((p) => { const t = D.teams.find((x) => x.name === D.holders[p]); return { p, t, on: !!t && S.teams[t.id].stage === 6 }; });
+    const earned = held.filter((h) => h.on).length;
+    const slots = held.map(({ p, t, on }) => `<div class="slot ${on ? 'on' : ''}"><span>FRAGMENT_0${p}</span><b>${on ? 'HELD BY ' + esc(t.name.toUpperCase()) : '[ REDACTED ]'}</b><i>0x${((p - 1) * 0x56).toString(16).padStart(2, '0')}</i></div>`).join('');
+    const pipe = [1, 2, 3, 4, 5].map((n) => `<span class="${n <= earned ? 'on' : ''}">STEP_0${n}</span>`).join('<em>→</em>');
+    const state = S.revealed ? 'UNLOCKED' : S.vaultOpen ? 'OPEN FOR DECRYPTION' : earned === 5 ? 'ALL FRAGMENTS HELD' : 'SEALED';
+    const vault = `<div class="vaultbox ${S.vaultOpen ? 'vopen' : ''} ${S.revealed ? 'vrev' : ''}"><div class="vhead"><span class="lbl">// THE VAULT</span><span class="vstate">${state}</span></div>
+      ${SAFE_BIG}<div class="vcount">${earned} / 5 FRAGMENTS RECOVERED</div><div class="slots v">${slots}</div><div class="pipe2">${pipe}</div>
+      ${S.vaultOpen && !S.revealed ? `<div class="vinst">JOIN THE FRAGMENTS 1 → 5 · APPLY THE STEPS 1 → 5 IN CYBERCHEF</div>` : ''}
+      ${S.revealed ? `<div class="reveal"><div id="rt" class="grn"></div><div class="flagline" id="fl" style="visibility:hidden">${esc(S.revealed.flag)}</div><div class="closed" id="cc" style="visibility:hidden">CASE CLOSED</div></div>` : ''}</div>`;
+    $app.innerHTML = `<div class="scr"><div class="scrtop"><h1>&gt;_ DECODE ME IF YOU CAN</h1><div class="clock">${clock}${S.pausedAt ? ' · PAUSED' : ''}</div></div>
       ${S.broadcast ? `<div class="bcast" style="font-size:1.8vw;margin-top:1vw">&gt; ${esc(S.broadcast.text)}</div>` : ''}
-      <div class="stand"><div class="standhd"><span>TEAM STANDINGS</span><span class="red live"><i class="dot off"></i>LIVE</span></div>${rows}</div><div class="lbl" style="margin-top:2vw;font-size:1.2vw">// THE VAULT</div><div class="slots">${slots}</div>
-      ${S.revealed ? `<div class="reveal"><div id="rt" class="grn"></div><div class="closed" id="cc" style="visibility:hidden">CASE CLOSED</div></div>` : ''}</div>`;
+      <div class="scrgrid ${full ? 'full' : ''}"><div class="stand"><div class="standhd"><span>TEAM STANDINGS</span><span class="red live"><i class="dot off"></i>LIVE</span></div>${rows}</div>${vault}</div>
+      <div class="lbl scrkey">press V to switch vault view</div></div>`;
     if (S.revealed) {
-      const full = S.revealed.plaintext, el = $app.querySelector('#rt'), cc = $app.querySelector('#cc');
-      const done = () => { el.textContent = full; cc.style.visibility = 'visible'; };
+      const text = S.revealed.plaintext, el = $app.querySelector('#rt'), cc = $app.querySelector('#cc'), fl = $app.querySelector('#fl');
+      const done = () => { el.textContent = text; cc.style.visibility = 'visible'; fl.style.visibility = 'visible'; };
       if (reduced || typedFor === S.revealed.t) done();
       else {
         typedFor = S.revealed.t; let i = 0;
-        clearInterval(typer); typer = setInterval(() => { i += 2; el.textContent = full.slice(0, i); if (i >= full.length) { clearInterval(typer); typer = null; cc.style.visibility = 'visible'; } }, 35);
+        clearInterval(typer); typer = setInterval(() => { i += 2; el.textContent = text.slice(0, i); if (i >= text.length) { clearInterval(typer); typer = null; cc.style.visibility = 'visible'; fl.style.visibility = 'visible'; } }, 35);
       }
     }
   }
@@ -608,10 +665,12 @@ function screenView() {
     // the projector has no stage data, so the admin console stores each team's score
     return (S.scores && S.scores[id]) || 0;
   }
-  const onStore = (e) => { if (e.key === AKEY && !typer) render(); };
+  const onStore = (e) => { if ((e.key === AKEY || e.key === 'dmc_names') && !typer) render(); };
+  const onKey = (e) => { if (e.key === 'v' || e.key === 'V') { full = !full; if (!typer) render(); } };
   window.addEventListener('storage', onStore);
+  window.addEventListener('keydown', onKey);
   const tick = setInterval(() => { if (!typer) render(); }, 1000);
-  teardown = () => { window.removeEventListener('storage', onStore); clearInterval(tick); clearInterval(typer); };
+  teardown = () => { window.removeEventListener('storage', onStore); window.removeEventListener('keydown', onKey); clearInterval(tick); clearInterval(typer); };
   render();
 }
 

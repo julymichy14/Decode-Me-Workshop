@@ -49,11 +49,15 @@ You need two windows on the host laptop:
 1. Hand each team its join code. They enter it on the landing page.
 2. Press **START GAME**. Stage 1 appears on every team page by itself. The console also shows the **START code**, which teams can type into the Clearance code box if a page shows OFFLINE.
 
+### Team names
+
+Teams are called Team Alpha, Bravo and so on by default. To rename them, type the new names into **Team names** at the bottom left of the console and press **Save names**. Every team page and the projector update straight away, and the names survive a reset. You can also set them at build time: `TEAM_NAMES="Cyber Owls,Null Pointers,Byte Me,Root Cause,Stack Smashers" ADMIN_PASSCODE=... node build.mjs` (in the order Alpha, Bravo, Charlie, Delta, Echo).
+
 ### 2. Each stage
 1. A team decodes their stage in CyberChef and walks over with the code word.
 2. Open that team in the console. The expected answer is shown big in green, with the decoded text, the CyberChef recipe and both hints.
 3. If it matches, press **VERIFY & UNLOCK**. The console shows a **clearance code**.
-4. The next stage opens on that team's devices by itself and their score updates. If their page shows OFFLINE, read them the code and they enter it in the Clearance code box.
+4. The team's page shows **ACCESS GRANTED** with a short story to read, from the intruder NullPhantom, which hides the clue for the next file (amber lines). The team presses **OPEN NEXT FILE** when they are ready. The first screen of the game is a mission briefing with an **OPEN FILE 01** button, and stage 5 ends with a "file recovered" screen. Scores update at the same time. If their page shows OFFLINE, read them the code and they enter it in the Clearance code box.
 
 The "Team said" box is optional. It only shows MATCH or NO MATCH to help you.
 
@@ -72,6 +76,7 @@ When a team finishes stage 5 they get one **vault fragment** and one **recipe st
 4. Press **Reveal final answer**. The projector plays the reveal and team pages show the message and "CASE CLOSED" (or read out the **REVEAL code** for OFFLINE pages).
 
 ### Other controls
+- **Projector vault view:** the projector shows the standings on the left and the vault on the right: a safe, five fragment slots that light up as teams finish stage 5, and the five recipe steps. When you open the vault it shows the instruction to join the fragments 1 to 5 and apply the steps 1 to 5. On **Reveal** the safe door swings open and the message and flag appear. Press **V** on the projector to show the vault full screen.
 - **Pause all** freezes the game clock on the projector.
 - **Broadcast** shows a message on the projector and as a banner on every team page.
 - **Hold team** stops you verifying a team by accident. It does not lock their browser.

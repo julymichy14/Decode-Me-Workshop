@@ -45,6 +45,10 @@ const pub = { salt: b64(salt), topic, pub: await crypto.subtle.exportKey('jwk', 
 const admin = { priv: await crypto.subtle.exportKey('jwk', kp.privateKey), startCode, vaultCode, revealCode, flag: src.vault.flag, vaultPlain: src.vault.plaintext,
   vaultRecipe: src.vault.recipe, teams: {} };
 
+// optional custom team names: TEAM_NAMES="Cyber Owls,Null Pointers,..." (in team order)
+const customNames = (process.env.TEAM_NAMES || '').split(',').map((x) => x.trim());
+src.teams.forEach((t, i) => { if (customNames[i]) t.name = customNames[i]; });
+
 for (const t of src.teams) {
   const joinCode = t.id.toUpperCase() + '-' + rnd(3);
   const blobs = {};
