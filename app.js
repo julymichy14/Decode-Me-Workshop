@@ -15,7 +15,7 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // a rebuilt data.js is a new game: forget every team session, entered code, note and admin state
 try {
   if (localStorage.getItem('dmc_build') !== D.salt) {
-    Object.keys(localStorage).filter((k) => /^dmc_(team|codes_|notes_|admin|names|sub_|fsub_)/.test(k)).forEach((k) => localStorage.removeItem(k));
+    Object.keys(localStorage).filter((k) => /^dmc_(team|codes_|notes_|admin|names|hints_)/.test(k)).forEach((k) => localStorage.removeItem(k));
     localStorage.setItem('dmc_build', D.salt);
   }
 } catch {}
@@ -292,10 +292,9 @@ async function teamView(id, pageArg) {
   const got = {}; // unlocked payloads
   let sel = 1, pending = false, msg = '', animKey = '', hmsg = '', restartCode = '', liveOk = false, bcast = null, brief = null;
   let page = pageArg === 'vault' ? 'vault' : 'main';
-  let sub = ls.get('dmc_sub_' + id, null);   // stage submission {n, text, status}
-  let fsub = ls.get('dmc_fsub_' + id, null); // flag submission {text, status, place}
-  let revealTyped = false, typer = null;
-  const saveSub = () => { ls.set('dmc_sub_' + id, sub); ls.set('dmc_fsub_' + id, fsub); };
+  let hintsUsed = ls.get('dmc_hints_' + id, {}); // hints this team has revealed: {stage: count}
+  let denied = null;                              // last wrong answer {kind, n, text, count, until}
+  let fails = 0, hintArm = 0, revealTyped = false, typer = null;
   async function tryKey(key, only) {
     const fresh = [];
     for (const k of Object.keys(blobs)) {
@@ -310,7 +309,7 @@ async function teamView(id, pageArg) {
   const cur = () => { let n = 0; for (let i = 1; i <= 5; i++) if (got['s' + i]) n = i; return n; };
   sel = cur() || 1;
   const solved = (n) => (n < 5 ? !!got['s' + (n + 1)] : !!got.done);
-  const hintsOn = (n) => (got[`h${n}_1`] ? 1 : 0) + (got[`h${n}_2`] ? 1 : 0);
+  const hintsOn = (n) => hintsUsed[n] || 0;
   const score = () => { let s = 0; for (let n = 1; n <= 5; n++) if (solved(n)) s += stagePts(got['s' + n].points, hintsOn(n));
     const c = cur();
     if (c && !solved(c)) { const p = got['s' + c].points; s -= Math.min(hintsOn(c) * hintCost(p), Math.max(0, p - 25)); }
@@ -319,15 +318,14 @@ async function teamView(id, pageArg) {
 
   const setPage = (p) => { page = p === 'vault' ? 'vault' : 'main'; setView(page === 'vault' ? 'vault' : 'team'); render(); window.scrollTo(0, 0); };
   const go = (p) => { const h = '#/team/' + id + (p === 'vault' ? '/vault' : ''); if (location.hash === h) setPage(p); else location.hash = h; };
-  const wipe = () => { Object.keys(got).forEach((k) => delete got[k]); ls.set(codeKey, []); localStorage.removeItem('dmc_notes_' + id); sel = 1; hmsg = ''; msg = ''; restartCode = ''; bcast = null; brief = null; sub = null; fsub = null; saveSub(); revealTyped = false; if (page === 'vault') { page = 'main'; setView('team'); location.hash = '#/team/' + id; } };
+  const wipe = () => { Object.keys(got).forEach((k) => delete got[k]); ls.set(codeKey, []); localStorage.removeItem('dmc_notes_' + id); sel = 1; hmsg = ''; msg = ''; restartCode = ''; bcast = null; brief = null; hintsUsed = {}; ls.set('dmc_hints_' + id, {}); denied = null; fails = 0; revealTyped = false; if (page === 'vault') { page = 'main'; setView('team'); location.hash = '#/team/' + id; } };
   function afterUnlock(fresh) {
     const stg = fresh.filter((k) => /^s\d$/.test(k)).map((k) => +k[1]);
     if (fresh.includes('done')) { sel = 5; brief = { n: 6 }; } else if (stg.length) { sel = Math.max(...stg); brief = { n: sel }; }
-    if (stg.length || fresh.includes('done')) { sub = null; saveSub(); }
+    if (stg.length || fresh.includes('done')) { denied = null; fails = 0; report(); }
     if (fresh.includes('reveal')) { flash('CASE CLOSED'); go('vault'); return; }
     if (fresh.includes('vault')) { flash('THE VAULT IS OPEN'); go('vault'); return; }
     if (fresh.some((k) => /^s\d$|^done$/.test(k))) flash('ACCESS GRANTED');
-    else if (fresh.some((k) => /^h\d_\d$/.test(k))) flash('HINT UNLOCKED');
     render();
   }
   async function onLive(b) {
@@ -337,29 +335,42 @@ async function teamView(id, pageArg) {
     if (b.epoch < myE) return;
     if (b.epoch > myE) ls.set('dmc_epoch', b.epoch);
     if (b.t === 'bcast') { if (Date.now() - b.ts < 30 * 60000) { bcast = { text: b.text }; render(); } return; }
-    if (b.t === 'reject' && b.team === id) {
-      if (b.kind === 'flag') { if (fsub) fsub = { ...fsub, status: 'rejected' }; }
-      else if (sub && b.n === sub.n) sub = { ...sub, status: 'rejected' };
-      saveSub(); render(); return;
-    }
-    if (b.t === 'flagok' && b.team === id) { fsub = { text: fsub ? fsub.text : '', status: 'accepted', place: b.place }; saveSub(); flash('FLAG ACCEPTED'); render(); return; }
     if (b.t === 'code' && (b.team === '*' || b.team === id)) {
       const fresh = await tryKey(await keyFor(b.code));
       if (fresh.length) { const cs = ls.get(codeKey, []); cs.push(norm(b.code)); ls.set(codeKey, cs); afterUnlock(fresh); }
     }
   }
-  async function submit(kind, text) {
-    const body = { id: uid(), kind, team: id, n: kind === 'stage' ? cur() : 0, text, ts: Date.now() };
-    if (kind === 'stage') sub = { n: body.n, text, status: 'pending' }; else fsub = { text, status: 'pending' };
-    saveSub(); render();
-    let ok = false; try { ok = await liveSubmit(body); } catch {}
-    if (!ok) { if (kind === 'stage') sub = { n: body.n, text, status: 'failed' }; else fsub = { text, status: 'failed' }; saveSub(); render(); }
+  // progress goes to the admin console (monitor only): no approval is needed
+  function report() {
+    const stage = got.done ? 6 : cur();
+    if (stage) liveSubmit({ id: uid(), t: 'progress', team: id, stage, hints: hintsUsed, ts: Date.now() }).catch(() => {});
   }
-  const subStatus = (s) => (!s ? '<span class="dim">Found the access phrase in the decoded file? Submit it. The host approves it, and then the next file opens.</span>'
-    : s.status === 'pending' ? `<span class="am">SUBMITTED: ${esc(s.text)}. Waiting for the host to approve it<span class="cur"></span></span>`
-    : s.status === 'rejected' ? `<span class="red">NOT ACCEPTED: ${esc(s.text)}. Check how you decoded it, and try again.</span>`
-    : s.status === 'accepted' ? `<span class="grn">ACCEPTED${s.place ? ' · PLACE #' + s.place : ''}. Wait for the host to open the final reveal.</span>`
-    : `<span class="red">Could not reach the host. Tell the admin your answer in person: ${esc(s.text)}</span>`);
+  // a correct answer is the key that opens the next file, so the check is automatic
+  async function attempt(kind, text) {
+    const now = Date.now();
+    if (denied && denied.until > now) return;
+    const c = cur();
+    const next = kind === 'flag' ? 'reveal' : c < 5 ? 's' + (c + 1) : 'done';
+    const pass = kind === 'flag' ? 'FLAG:' + text : `${id}:${c}:${text}`;
+    pending = true;
+    const fresh = got[next] ? [] : await tryKey(await keyFor(pass), (k) => k === next);
+    pending = false;
+    if (fresh.length) {
+      const cs = ls.get(codeKey, []); cs.push(norm(pass)); ls.set(codeKey, cs);
+      if (kind === 'flag') liveSubmit({ id: uid(), t: 'flag', team: id, ts: Date.now() }).catch(() => {});
+      afterUnlock(fresh); return;
+    }
+    fails++;
+    denied = { kind, n: c, text, count: fails, until: fails >= 3 ? Date.now() + Math.min(30, 4 * (fails - 2)) * 1000 : 0 };
+    render();
+    const f = $app.querySelector(kind === 'flag' ? '#ff' : '#af'); if (f) { f.classList.add('shake'); }
+    if (denied.until) setTimeout(() => { if (denied && denied.until <= Date.now() + 50) render(); }, denied.until - Date.now() + 100);
+  }
+  const deniedStatus = (kind) => {
+    if (!denied || denied.kind !== kind || (kind === 'stage' && denied.n !== cur())) return '<span class="dim">' + (kind === 'flag' ? 'Be the first team to bring the flag for a bonus.' : 'Type the access phrase you found in the decoded file. It is checked automatically.') + '</span>';
+    const wait = denied.until > Date.now() ? ` Too many tries: wait ${Math.ceil((denied.until - Date.now()) / 1000)}s.` : '';
+    return `<span class="red"><b>ACCESS DENIED.</b> "${esc(denied.text)}" is not it. Check how you decoded the file and try again.${wait}</span>`;
+  };
   const headRight = () => `<span class="mono">TEAM ${esc(T.name.replace('Team ', '').toUpperCase())}</span>${got.vault ? `<a class="mono am" href="#/team/${id}${page === 'vault' ? '' : '/vault'}">${page === 'vault' ? 'CASE FILES' : 'VAULT'}</a>` : ''}
       <span class="mono ${liveOk ? 'grn' : 'red'}" id="live"><i class="dot ${liveOk ? '' : 'off'}"></i>${liveOk ? 'LIVE' : 'OFFLINE'}</span><span class="mono grn">SCORE ${score()}</span><span class="mono grn clock" data-clock>${new Date().toTimeString().slice(0, 5)}</span><a class="mono" href="#/" id="out">EXIT</a>`;
 
@@ -384,15 +395,14 @@ async function teamView(id, pageArg) {
       const isActive = sel === c && !solved(sel);
       const lines = (st.evidence_extra || [st.encoded]).map((t) => ({ t }));
       const docs = (st.docs || []).map((d) => `<div class="doc"><div class="dh"><span>${esc(d.name)}</span></div><pre class="dbody">${esc(d.text)}</pre></div>`).join('');
-      const mySub = sub && sub.n === st.n ? sub : null;
       main = `<div class="tabs"><div class="on">${esc(st.file)}</div></div><div class="body">
         <div class="lbl">// CASE FILE ${String(st.n).padStart(2, '0')} ${solved(sel) ? '· SOLVED' : ''}</div>
         <h2 class="t">${esc(st.title.toUpperCase())}</h2>
-        <div class="how"><b>HOW IT WORKS</b> <span>1 READ the dossier.</span> <span>2 SOLVE its riddle to find the KEY.</span> <span>3 UNLOCK the file in <a href="https://gchq.github.io/CyberChef/" target="_blank" rel="noopener">CyberChef</a> with that key.</span> <span>4 SUBMIT the ACCESS PHRASE you find inside.</span></div>
+        <div class="how"><b>HOW IT WORKS</b> <span>1 READ the dossier.</span> <span>2 SOLVE its riddle to find the KEY.</span> <span>3 UNLOCK the file in <a href="https://gchq.github.io/CyberChef/" target="_blank" rel="noopener">CyberChef</a> with that key.</span> <span>4 SUBMIT the ACCESS PHRASE you find inside. It is checked automatically.</span></div>
         <div class="lbl sec">// DOSSIER · readable evidence from ${esc(s1.host)}</div>${docs}
         <div class="lbl sec">// LOCKED FILE</div>${termBox(st.file, lines)}`;
       if (isActive) {
-        main += `<form class="answer" id="af"><span class="lbl">// ACCESS PHRASE</span><div class="prompt"><span class="grn">&gt;</span><input id="ai" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="type it here"><button class="btn">SUBMIT</button></div></form><div class="sstat">${subStatus(mySub)}</div>`;
+        main += `<form class="answer" id="af"><span class="lbl">// ACCESS PHRASE</span><div class="prompt"><span class="grn">&gt;</span><input id="ai" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="type it here"><button class="btn" ${denied && denied.kind === 'stage' && denied.until > Date.now() ? 'disabled' : ''}>SUBMIT</button></div></form><div class="sstat">${deniedStatus('stage')}</div>`;
       } else if (solved(sel)) {
         const r = recap(sel);
         main += `<div class="recap"><div class="lbl">// WHAT THE FILE SAID</div><p class="mono grn" style="word-break:break-word;white-space:pre-wrap">${esc(r.decoded)}</p><p class="dim mono">Recipe: ${esc(r.recipe.join(' → '))}</p></div>`;
@@ -410,13 +420,12 @@ async function teamView(id, pageArg) {
         <div class="kv"><span>DIFFICULTY</span><b class="diff">${[1, 2, 3, 4, 5].map((n) => `<i class="${n <= st.n ? 'on' : ''}"></i>`).join('')}</b></div>
         <div class="polaroid mini">${st.n % 2 ? HOUSE : MAP}</div></div>`;
       if (isActive) {
-        hints = `<div class="panel side hintpanel"><div class="lbl am">${BULB} HINTS</div>`;
+        const used = hintsUsed[st.n] || 0;
+        hints = `<div class="panel side hintpanel"><div class="lbl am">${BULB} HINTS · each one costs ${hintCost(st.points)} pts</div>`;
         for (let k = 1; k <= 2; k++) {
-          const h = got[`h${st.n}_${k}`];
-          hints += h ? `<div class="hint on"><span class="am mono">${BULB} HINT ${k} (−${hintCost(st.points)} PTS)</span><br>${esc(h.text)}</div>`
-            : `<form class="hint off hkey" data-k="${k}"><span class="am mono">${BULB} HINT ${k} · LOCKED (−${hintCost(st.points)} PTS)</span><span class="dim">Ask the admin for a hint.</span><div class="prompt"><input placeholder="HINT KEY" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn amber">REVEAL</button></div></form>`;
+          if (k <= used) hints += `<div class="hint on"><span class="am mono">${BULB} HINT ${k}</span><br>${esc((st.hints || [])[k - 1] || '')}</div>`;
+          else hints += `<div class="hint off hbtn"><button class="btn amber ${hintArm === k ? 'arm' : ''}" data-hint="${k}" ${k > used + 1 ? 'disabled' : ''}>${k > used + 1 ? 'Reveal hint 1 first' : hintArm === k ? 'Click again to confirm (−' + hintCost(st.points) + ' pts)' : 'Reveal hint ' + k + ' (−' + hintCost(st.points) + ' pts)'}</button></div>`;
         }
-        if (hmsg) hints += `<div class="err">${esc(hmsg)}</div>`;
         hints += `</div>`;
       }
     }
@@ -453,16 +462,11 @@ async function teamView(id, pageArg) {
       <div class="rcol">${info}${hints}${notes}</div></div></main>`;
     $app.querySelectorAll('.card').forEach((b) => (b.onclick = () => { sel = +b.dataset.n; render(); }));
     const ob = $app.querySelector('#open'); if (ob) ob.onclick = () => { brief = null; animKey = ''; render(); };
-    const af = $app.querySelector('#af'); if (af) af.onsubmit = (ev) => { ev.preventDefault(); const v = $app.querySelector('#ai').value.trim(); if (v) submit('stage', v); };
-    $app.querySelectorAll('.hkey').forEach((f) => (f.onsubmit = async (ev) => {
-      ev.preventDefault();
-      const code = norm(f.querySelector('input').value); if (!code || pending) return;
-      pending = true;
-      const fresh = await tryKey(await keyFor(code), (k) => /^h\d_\d$/.test(k));
-      pending = false;
-      if (!fresh.length) { hmsg = 'ERR: not a valid hint key for this stage'; render(); return; }
-      hmsg = ''; const codes = ls.get(codeKey, []); codes.push(code); ls.set(codeKey, codes);
-      flash('HINT UNLOCKED'); render();
+    const af = $app.querySelector('#af'); if (af) af.onsubmit = (ev) => { ev.preventDefault(); const v = $app.querySelector('#ai').value.trim(); if (v && !pending) attempt('stage', v); };
+    $app.querySelectorAll('[data-hint]').forEach((bt) => (bt.onclick = () => {
+      const k = +bt.dataset.hint;
+      if (hintArm !== k) { hintArm = k; render(); setTimeout(() => { if (hintArm === k) { hintArm = 0; render(); } }, 4000); return; }
+      hintArm = 0; hintsUsed[cur()] = Math.max(hintsUsed[cur()] || 0, k); ls.set('dmc_hints_' + id, hintsUsed); flash('HINT REVEALED'); report(); render();
     }));
     const nt = $app.querySelector('#notes'); if (nt) nt.oninput = () => ls.set('dmc_notes_' + id, nt.value);
     if (st) wireCopy($app, st.encoded);
@@ -511,8 +515,8 @@ async function teamView(id, pageArg) {
       return `<div class="vslot ${own ? 'on' : ''}"><span>FRAGMENT_0${p}</span><b class="${own ? 'frag' : ''}">${own ? esc(mine.fragment) : '[ REDACTED ] HELD BY ' + esc((D.holders[p] || '???').toUpperCase())}</b><i>0x${((p - 1) * 0x56).toString(16).padStart(2, '0')}</i></div>`;
     }).join('');
     const pipe = [1, 2, 3, 4, 5].map((s) => { const own = mine && mine.step === s; return `<span class="${own ? 'has' : ''}">STEP_0${s}${own ? ' ' + esc(mine.label) : ' [ ? ]'}</span>`; }).join('<em>→</em>');
-    const flagForm = !isOpen ? '' : rev ? '' : `<div class="panel vpanel"><div class="lbl">// BREAK THE VAULT</div><p class="dim">When your teams have joined the fragments and applied the steps, you will read a message with a flag in it. Submit the flag here. The host approves it.</p>
-      <form class="answer" id="ff"><div class="prompt"><span class="grn">&gt;</span><input id="fi" autocomplete="off" spellcheck="false" placeholder="GDG{...}"><button class="btn">SUBMIT FLAG</button></div></form><div class="sstat">${fsub ? subStatus(fsub) : '<span class="dim">Be the first team to bring the flag for a bonus.</span>'}</div></div>`;
+    const flagForm = !isOpen ? '' : rev ? '' : `<div class="panel vpanel"><div class="lbl">// BREAK THE VAULT</div><p class="dim">When your teams have joined the fragments and applied the steps, you will read a message with a flag in it. Type the flag here. It is checked automatically, and the first team to bring it gets a bonus.</p>
+      <form class="answer" id="ff"><div class="prompt"><span class="grn">&gt;</span><input id="fi" autocomplete="off" spellcheck="false" placeholder="GDG{...}"><button class="btn" ${denied && denied.kind === 'flag' && denied.until > Date.now() ? 'disabled' : ''}>SUBMIT FLAG</button></div></form><div class="sstat">${deniedStatus('flag')}</div></div>`;
     $app.innerHTML = chrome(headRight()) + `<main class="vmain"><a class="mono" href="#/team/${id}">← BACK TO THE CASE FILES</a>
       <div class="vgrid"><div class="vbox ${isOpen ? 'vopen' : ''} ${rev ? 'vrev' : ''}">${SAFE_BIG}<div class="vstate">${rev ? 'UNLOCKED' : isOpen ? 'OPEN FOR DECRYPTION' : 'SEALED'}</div></div>
       <div class="vside"><div class="panel vpanel"><div class="lbl">// ${isOpen ? 'THE FIVE TEAMS ARE HERE' : 'NOT OPEN YET'}</div><h2 class="t">THE VAULT</h2>
@@ -521,7 +525,7 @@ async function teamView(id, pageArg) {
         <div class="vslots">${slots}</div><div class="pipe3">${pipe}</div>` : '<p class="dim">The host opens the vault when every team has its fragment. Stay on this page, it opens by itself.</p>'}</div>
       ${flagForm}
       ${rev ? `<div class="panel vpanel reveal2"><div class="lbl">// FINAL DECRYPT</div><div class="vmsg mono grn" id="rt"></div><div class="flagline">${esc(rev.flag)}</div><div class="closed">CASE CLOSED</div></div>` : ''}</div></div></main>`;
-    const ff = $app.querySelector('#ff'); if (ff) ff.onsubmit = (ev) => { ev.preventDefault(); const v = $app.querySelector('#fi').value.trim(); if (v) submit('flag', v); };
+    const ff = $app.querySelector('#ff'); if (ff) ff.onsubmit = (ev) => { ev.preventDefault(); const v = $app.querySelector('#fi').value.trim(); if (v && !pending) attempt('flag', v); };
     $app.querySelector('#out').onclick = () => localStorage.removeItem('dmc_team');
     if (rev) {
       const el = $app.querySelector('#rt'), text = rev.plaintext;
@@ -532,6 +536,7 @@ async function teamView(id, pageArg) {
   activeTeam = { id, setPage };
   setView(page === 'vault' ? 'vault' : 'team');
   render();
+  report();
   const stopLive = liveSubscribe(onLive, (ok) => {
     liveOk = ok;
     const e = document.getElementById('live');
@@ -585,46 +590,40 @@ async function adminView() {
   const verifyIn = (S, teamId) => {
     const tm = A.teams[teamId], x = S.teams[teamId], n = x.stage;
     x.verifiedAt.push(Date.now()); x.stage++; x.stageStart = Date.now(); x.last = Date.now(); typed = '';
-    S.announce = { label: `${tm.name} · stage ${n} verified`, code: tm.stages[n - 1].unlockCode, team: teamId };
+    S.announce = { label: `${tm.name} · access granted by override`, code: tm.stages[n - 1].unlockCode, team: teamId, hidden: true };
     log(S, `${tm.name} verified stage ${n} (+${stagePts(tm.stages[n - 1].points, x.hints[n] || 0)})`);
   };
-  const resolve = (S, id, status) => { S.subs = S.subs || {}; S.subs[id] = status; };
-  let subs = [], qState = 'connecting';
+  let qState = 'connecting';
   const resetAt = () => ls.get('dmc_admin_resetAt', 0);
-  function renderQueue() {
-    const el = document.getElementById('queue'); if (!el) return;
-    const S = loadS();
-    const pend = subs.filter((x) => !(S.subs || {})[x.id]).sort((a, b) => a.ts - b.ts);
-    el.innerHTML = `<div class="lbl">// SUBMISSIONS <span class="${qState === 'live' ? 'grn' : 'red'}">${qState === 'live' ? '● LIVE' : '● ' + qState.toUpperCase()}</span> · ${pend.length} waiting</div>` + (pend.length ? pend.map((x) => {
-      const team = A.teams[x.team]; if (!team) return '';
-      const isFlag = x.kind === 'flag', ts = S.teams[x.team];
-      const expected = isFlag ? A.flag : (team.stages[x.n - 1] || {}).answer || '';
-      const match = norm(x.text) === norm(expected);
-      const stale = !isFlag && (!ts || ts.stage !== x.n);
-      return `<div class="sub ${stale ? 'stale' : ''}" data-id="${esc(x.id)}"><div class="sh"><b>${esc(team.name)}</b> <span class="dim">${isFlag ? 'FLAG' : 'STAGE ' + x.n}</span> <span class="dim">${new Date(x.ts).toLocaleTimeString()}</span>${stale ? ' <span class="am">STALE</span>' : ''}</div>
-        <div class="st"><span class="said">${esc(x.text)}</span> <span class="mono ${match ? 'grn' : 'red'}">${match ? 'MATCH' : 'NO MATCH'}</span> <span class="dim mono">expected: ${esc(expected)}</span></div>
-        <div class="actions">${stale ? '<button class="btn ghost sdismiss">Dismiss</button>' : `<button class="btn sapprove" ${(ts && (ts.hold || S.pausedAt)) ? 'disabled' : ''}>&gt; APPROVE</button><button class="btn danger sreject">Reject</button>`}</div></div>`;
-    }).join('') : '<p class="dim" style="margin:6px 0 0">No submissions waiting. Teams submit their access phrase on their own page.</p>');
-    el.querySelectorAll('.sub').forEach((row) => {
-      const x = subs.find((q) => q.id === row.dataset.id); if (!x) return;
-      const ap = row.querySelector('.sapprove'), rj = row.querySelector('.sreject'), ds = row.querySelector('.sdismiss');
-      if (ap) ap.onclick = () => {
-        let place = 0;
-        act((S2) => {
-          if (x.kind === 'flag') { if (!S2.bonus.includes(x.team) && S2.bonus.length < 3) S2.bonus.push(x.team); place = S2.bonus.indexOf(x.team) + 1; log(S2, `${A.teams[x.team].name} flag approved (place ${place || '-'})`); }
-          else verifyIn(S2, x.team);
-          resolve(S2, x.id, 'approved');
-        });
-        if (x.kind === 'flag') pub({ t: 'flagok', team: x.team, place });
-      };
-      if (rj) rj.onclick = () => { act((S2) => { resolve(S2, x.id, 'rejected'); log(S2, `${A.teams[x.team].name} submission rejected: ${x.text}`); }); pub({ t: 'reject', team: x.team, n: x.n, kind: x.kind, id: x.id }); };
-      if (ds) ds.onclick = () => act((S2) => resolve(S2, x.id, 'dismissed'));
-    });
+  // teams check their own answers; they only report progress here, so this console is a monitor
+  function applyProgress(b) {
+    const S = loadS(); if (!S.startedAt) return;
+    const x = S.teams[b.team], tm = A.teams[b.team]; if (!x || !tm) return;
+    let changed = false;
+    if (b.stage > x.stage) {
+      for (let n = x.stage; n < b.stage && n <= 5; n++) { x.verifiedAt.push(b.ts); log(S, `${tm.name} solved stage ${n} (${tm.stages[n - 1].title})`); }
+      x.stage = b.stage; x.stageStart = Date.now(); changed = true;
+    }
+    for (const n in (b.hints || {})) if ((b.hints[n] || 0) > (x.hints[n] || 0)) { x.hints[n] = b.hints[n]; log(S, `${tm.name} used hint ${b.hints[n]} on stage ${n}`); changed = true; }
+    if (!changed) return;
+    x.last = Date.now();
+    S.scores = Object.fromEntries(D.teams.map((t) => [t.id, teamScore(S, A, t.id)]));
+    saveS(S);
+    if (!S.vaultOpen && D.teams.every((t) => S.teams[t.id].stage === 6)) { act((S2) => { S2.vaultOpen = true; S2.announce = { label: 'VAULT CODE (all teams)', code: A.vaultCode }; log(S2, 'All five teams finished: the vault opened automatically'); }); return; }
+    softRender();
   }
+  function applyFlag(b) {
+    const S = loadS(); const tm = A.teams[b.team]; if (!tm || S.bonus.includes(b.team)) return;
+    if (S.bonus.length < 3) S.bonus.push(b.team);
+    log(S, `${tm.name} found the flag (place ${S.bonus.indexOf(b.team) + 1})`);
+    S.scores = Object.fromEntries(D.teams.map((t) => [t.id, teamScore(S, A, t.id)]));
+    saveS(S); softRender();
+  }
+  const softRender = () => { const a = document.activeElement; if (!a || !/INPUT|TEXTAREA/.test(a.tagName)) render(); };
   const stopSubs = liveSubscribe((b) => {
-    if (!b || !b.id || !b.team || b.ts < resetAt() || subs.some((q) => q.id === b.id)) return;
-    subs.push(b); renderQueue();
-  }, (ok) => { qState = ok ? 'live' : 'offline'; renderQueue(); }, { suffix: '-s', raw: true });
+    if (!b || !b.team || !b.ts || b.ts < resetAt()) return;
+    if (b.t === 'progress') applyProgress(b); else if (b.t === 'flag') applyFlag(b);
+  }, (ok) => { qState = ok ? 'live' : 'offline'; const e = document.getElementById('qstate'); if (e) { e.className = ok ? 'grn' : 'red'; e.textContent = ok ? '● LISTENING TO TEAMS' : '● OFFLINE'; } }, { suffix: '-s', raw: true });
 
   function render() {
     const S = loadS(), tm = A.teams[sel], ts = S.teams[sel], st = tm.stages[Math.min(ts.stage, 5) - 1];
@@ -638,7 +637,7 @@ async function adminView() {
     let detail = '';
     if (!started) detail = `<p class="dim">Game not started. Press START GAME, then announce the START code.</p>`;
     else if (ts.stage === 6) detail = `<div class="big">COMPLETE</div><p class="dim">All five stages verified. Fragment ${tm.fragment_position} · stage 5 answer was ${esc(tm.stages[4].answer)}.</p>
-      <div class="actions"><button class="btn danger ${armed === 'undo' ? 'arm' : ''}" id="undo">${armed === 'undo' ? 'CONFIRM UNDO?' : 'Undo last verification'}</button></div>`;
+`;
     else if (ts.stage >= 1) {
       const h = ts.hints[ts.stage] || 0;
       const said = norm(typed), ok = said && said === norm(st.answer);
@@ -647,22 +646,11 @@ async function adminView() {
         <p class="mono" style="word-break:break-word;white-space:pre-wrap;font-size:13px">${esc(st.decoded)}</p>
         ${st.keyNote ? `<p class="lbl am">HOW THE KEY IS FOUND: <span class="mono" style="text-transform:none;letter-spacing:0">${esc(st.keyNote)}</span></p>` : ''}
         <p class="lbl">RECIPE: <span class="cy">${esc(st.recipe.join(' → '))}</span></p>
-        <p class="dim" style="font-size:13px">H1: ${esc(st.hints[0])}<br>H2: ${esc(st.hints[1])}</p>
         <details><summary class="lbl">ENCODED</summary><div class="mono cy" style="word-break:break-all;font-size:12px">${esc(st.encoded)}</div></details>
-        <div class="gap"><span class="lbl">TEAM SAID</span> <input class="f" id="said" value="${esc(typed)}" placeholder="optional" style="width:160px"> <span id="match" class="mono ${ok ? 'grn' : 'red'}">${said ? (ok ? 'MATCH' : 'NO MATCH') : ''}</span></div>
-        <div class="actions"><button class="btn" id="verify" ${ts.hold || S.pausedAt ? 'disabled' : ''}>&gt; VERIFY &amp; UNLOCK</button>
-        <button class="btn ghost" id="h1" ${h >= 1 ? 'disabled' : ''}>Release hint 1 (−${hintCost(st.points)})</button>
-        <button class="btn ghost" id="h2" ${h !== 1 ? 'disabled' : ''}>Release hint 2 (−${hintCost(st.points)})</button>
-        <button class="btn ghost" id="hold">${ts.hold ? 'Resume team' : 'Hold team'}</button>
-        <button class="btn danger ${armed === 'undo' ? 'arm' : ''}" id="undo" ${ts.stage < 2 ? 'disabled' : ''}>${armed === 'undo' ? 'CONFIRM UNDO?' : 'Undo last verification'}</button></div>`;
+        <p class="dim mono" style="font-size:12px">Hints used by the team on this stage: ${h}</p>
+        <div class="actions"><button class="btn ghost" id="verify">Grant access (override)</button></div>`;
     }
-    const issued = [];
-    if (S.startedAt) issued.push(['START (everyone)', A.startCode]);
-    for (let n = 1; n <= Math.min(ts.stage, 6); n++) {
-      for (let k = 1; k <= (ts.hints[n] || 0); k++) issued.push([`💡 Stage ${n} hint ${k} (HINT KEY)`, tm.stages[n - 1].hintCodes[k - 1]]);
-      if (n < ts.stage) issued.push([`Stage ${n} verified`, tm.stages[n - 1].unlockCode]);
-    }
-    const issuedHtml = `<div class="gap"><div class="lbl">// CODES ISSUED TO ${esc(tm.name.toUpperCase())}</div><div class="mono" style="font-size:12px;margin-top:6px">${issued.map(([l, c]) => `${esc(l)}: <span class="am">${esc(c)}</span>`).join('<br>') || 'none yet'}</div></div>`;
+    const issuedHtml = '';
     const slots = [1, 2, 3, 4, 5].map((p) => {
       const t = D.teams.find((x) => x.name === D.holders[p]);
       const on = t && S.teams[t.id].stage === 6;
@@ -678,8 +666,8 @@ async function adminView() {
       <button class="btn ghost" id="reveal" ${S.revealed || !S.vaultOpen ? 'disabled' : ''}>Reveal final answer</button>
       <button class="btn danger ${armed === 'reset' ? 'arm' : ''}" id="reset">${armed === 'reset' ? 'CONFIRM RESET?' : 'Reset game'}</button></div>
     ${resetNote && !started ? `<div class="panel" style="padding:12px 16px;margin-bottom:16px"><span class="lbl am">// GAME RESET</span><p style="margin:6px 0 0">Your console and the projector are cleared. <b>Every team device that is online has been reset automatically. A device that was offline resets when it reconnects. If a team still shows old progress, they can enter the START code twice to restart.</p></div>` : ''}
-    <div class="panel queue" id="queue"></div>
-    ${S.announce ? (S.announce.kind === 'hint' ? `<div class="panel hintann" style="padding:12px 16px;margin-bottom:16px"><span class="lbl am">${BULB} HINT KEY · ${esc(S.announce.label)}</span><br><span class="codebox">${esc(S.announce.code)}</span><span class="dim mono" style="font-size:12px"> &nbsp;give this to the team, they enter it in their Hints panel</span></div>` : `<div class="panel" style="padding:12px 16px;margin-bottom:16px"><span class="lbl">// READ OUT NOW · ${esc(S.announce.label)}</span><br><span class="codebox">${esc(S.announce.code)}</span></div>`) : ''}
+    <div class="panel queue"><div class="lbl">// AUTOMATIC MODE <span id="qstate" class="${qState === 'live' ? 'grn' : 'red'}">${qState === 'live' ? '● LISTENING TO TEAMS' : '● ' + qState.toUpperCase()}</span></div><p class="dim" style="margin:6px 0 0">Teams check their own answers: a correct access phrase opens the next file by itself. This console only monitors progress. The vault opens automatically when all five teams finish. Use "Grant access" only if a team is stuck or offline.</p></div>
+    ${S.announce && !S.announce.hidden ? (S.announce.kind === 'hint' ? `<div class="panel hintann" style="padding:12px 16px;margin-bottom:16px"><span class="lbl am">${BULB} HINT KEY · ${esc(S.announce.label)}</span><br><span class="codebox">${esc(S.announce.code)}</span><span class="dim mono" style="font-size:12px"> &nbsp;give this to the team, they enter it in their Hints panel</span></div>` : `<div class="panel" style="padding:12px 16px;margin-bottom:16px"><span class="lbl">// READ OUT NOW · ${esc(S.announce.label)}</span><br><span class="codebox">${esc(S.announce.code)}</span></div>`) : ''}
     <div class="adm"><div class="panel" style="padding:8px"><table><tr><th>TEAM</th><th>STAGES</th><th>#</th><th>TIME</th><th>HINTS</th><th>SCORE</th><th>LAST</th></tr>${rows}</table>
       <div class="gap" style="padding:8px"><div class="lbl">// VAULT TRACKER</div><div class="mono" style="font-size:13px;margin-top:6px">${slots}</div>
       <div class="actions"><span class="lbl" style="align-self:center">FLAG BONUS</span>${D.teams.map((t) => `<button class="btn ghost bonus" data-t="${t.id}" ${S.bonus.includes(t.id) || S.bonus.length >= 3 ? 'disabled' : ''}>${esc(t.name.replace('Team ', ''))}</button>`).join('')}</div>
@@ -690,7 +678,6 @@ async function adminView() {
 
     const $ = (s) => $app.querySelector(s), on = (s, f) => { const e = $(s); if (e) e.onclick = f; };
     $app.querySelectorAll('tr.row').forEach((r) => (r.onclick = () => { sel = r.dataset.t; typed = ''; render(); }));
-    const said = $('#said'); if (said) said.oninput = () => { typed = said.value; const ok = norm(typed) && norm(typed) === norm(st.answer); $('#match').textContent = norm(typed) ? (ok ? 'MATCH' : 'NO MATCH') : ''; $('#match').className = 'mono ' + (ok ? 'grn' : 'red'); };
     on('#start', () => act((S) => {
       resetNote = false; if (ls.get('dmc_names')) pub({ t: 'names', names: ls.get('dmc_names') }); S.startedAt = Date.now(); for (const id in S.teams) Object.assign(S.teams[id], { stage: 1, stageStart: Date.now(), last: Date.now() }); S.announce = { label: 'START CODE (all teams)', code: A.startCode }; log(S, 'Game started'); }));
     on('#pause', () => act((S) => { if (S.pausedAt) { S.pausedTotal += Date.now() - S.pausedAt; S.pausedAt = null; log(S, 'Resumed'); } else { S.pausedAt = Date.now(); log(S, 'Paused'); } }));
@@ -701,21 +688,10 @@ async function adminView() {
     };
     on('#bcb', () => { const v = $('#bc').value.trim(); if (v) { pub({ t: 'bcast', text: v }); act((S) => { S.broadcast = { text: v, t: Date.now() }; log(S, 'Broadcast: ' + v); }); } });
     on('#vault', () => act((S) => { S.vaultOpen = true; S.announce = { label: 'VAULT CODE (all teams)', code: A.vaultCode }; log(S, 'Vault opened'); }));
-    on('#reveal', () => act((S) => { S.revealed = { plaintext: A.vaultPlain, flag: A.flag, t: Date.now() }; S.announce = { label: 'REVEAL CODE (all teams)', code: A.revealCode }; log(S, 'Final answer revealed'); }));
-    on('#reset', () => arm('reset', () => { localStorage.removeItem(AKEY); ls.set('dmc_admin_resetAt', Date.now()); subs = []; ls.set('dmc_admin_epoch', epoch() + 1); pub({ t: 'reset' }); resetNote = true; render(); }));
+    on('#reveal', () => act((S) => { S.revealed = { plaintext: A.vaultPlain, flag: A.flag, t: Date.now() }; S.announce = { label: 'REVEAL (sent to all teams)', code: A.revealCode, hidden: true }; log(S, 'Final answer revealed'); }));
+    on('#reset', () => arm('reset', () => { localStorage.removeItem(AKEY); ls.set('dmc_admin_resetAt', Date.now()); ls.set('dmc_admin_epoch', epoch() + 1); pub({ t: 'reset' }); resetNote = true; render(); }));
     on('#verify', () => act((S) => verifyIn(S, sel)));
-    [1, 2].forEach((k) => on('#h' + k, () => act((S) => {
-      const x = S.teams[sel], n = x.stage; x.hints[n] = k; x.last = Date.now();
-      S.announce = { label: `${tm.name} · stage ${n} · hint ${k}`, code: tm.stages[n - 1].hintCodes[k - 1], kind: 'hint', team: sel };
-      log(S, `${tm.name} hint ${k} on stage ${n}`);
-    })));
-    on('#hold', () => act((S) => { S.teams[sel].hold = !S.teams[sel].hold; log(S, `${tm.name} ${S.teams[sel].hold ? 'held' : 'resumed'}`); }));
-    on('#undo', () => arm('undo', () => act((S) => {
-      const x = S.teams[sel]; if (x.stage < 2) return; x.stage--; x.verifiedAt.pop(); x.stageStart = Date.now(); delete x.hints[x.stage + 1];
-      log(S, `${tm.name} rolled back to stage ${x.stage}. Their devices keep anything already decrypted`);
-    })));
     $app.querySelectorAll('.bonus').forEach((b) => (b.onclick = () => act((S) => { S.bonus.push(b.dataset.t); log(S, `Flag bonus #${S.bonus.length} to ${A.teams[b.dataset.t].name}`); })));
-    renderQueue();
   }
   const onStore = (e) => { if (e.key === AKEY) render(); };
   window.addEventListener('storage', onStore);

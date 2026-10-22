@@ -37,7 +37,8 @@ async function sha256(s) {
 }
 
 const passcode = process.env.ADMIN_PASSCODE || rnd(8);
-const startCode = code(), vaultCode = code(), revealCode = code();
+// Each next file is sealed with a key made from the previous file's ACCESS PHRASE: a correct answer opens it by itself.
+const startCode = code(), vaultCode = code(), revealCode = 'FLAG:' + src.vault.flag; // the reveal opens with the flag itself
 // signing key pair: only the admin console can sign live messages, team pages verify them
 const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
 const topic = 'dmc-' + rnd(16).toLowerCase();
@@ -53,19 +54,17 @@ for (const t of src.teams) {
   const joinCode = t.id.toUpperCase() + '-' + rnd(3);
   const blobs = {};
   const at = { name: t.name, joinCode, fragment_position: t.fragment_position, stages: [] };
-  const codes = t.stages.map(() => code());
+  const codes = t.stages.map((s) => `${t.id}:${s.n}:${s.answer}`); // passphrase that opens whatever comes after stage n
   for (const s of t.stages) {
-    const p = { n: s.n, title: s.title, file: s.file, points: s.points, layers: s.layers, docs: s.docs, encoded: s.encoded };
+    const p = { n: s.n, title: s.title, file: s.file, points: s.points, layers: s.layers, docs: s.docs, hints: s.hints, encoded: s.encoded };
     if (s.evidence_extra) p.evidence_extra = s.evidence_extra;
     if (s.n === 1) { p.system = t.system; p.host = t.host; }
     const prev = s.n > 1 ? t.stages[s.n - 2] : null;
     if (prev) p.prev = { decoded: prev.decoded, recipe: prev.recipe };
     blobs['s' + s.n] = await seal(p, s.n === 1 ? startCode : codes[s.n - 2]);
-    const hc = [code(), code()];
-    for (let k = 0; k < 2; k++) blobs[`h${s.n}_${k + 1}`] = await seal({ text: s.hints[k] }, hc[k]);
     at.stages.push({ n: s.n, title: s.title, file: s.file, points: s.points, encoded: s.encoded, decoded: s.decoded,
-      recipe: s.recipe, answer: s.answer, keyNote: s.keyNote, key: s.key, hints: s.hints, hintCodes: hc,
-      unlockCode: codes[s.n - 1] }); // read out after verifying this stage
+      recipe: s.recipe, answer: s.answer, keyNote: s.keyNote, key: s.key, hints: s.hints,
+      unlockCode: codes[s.n - 1] }); // passphrase the admin console can send as an override
   }
   blobs.done = await seal({
     prev: { decoded: t.stages[4].decoded, recipe: t.stages[4].recipe },

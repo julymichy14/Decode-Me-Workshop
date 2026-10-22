@@ -22,7 +22,7 @@ Each team investigates one hacked system through five **case files**. A case fil
 1. **Dossier (readable):** the team reads plain-text evidence in the story: emails, logs, notes. Hidden in it is a **riddle or puzzle** whose answer is the **KEY**. The puzzles vary: a riddle, a Morse or A1Z26 or Atbash or hex-ASCII line, an acrostic, a bit of arithmetic, or a callback to something in an earlier file.
 2. **Locked file (encoded):** the key is needed to open the encoded file in [CyberChef](https://gchq.github.io/CyberChef/). The file has several layers (Base64, Hex, Base32, Binary, Decimal, Reverse, URL, ROT13 with an Amount) and a **keyed lock** (Vigenere, XOR or Rail Fence). Without the right key the output is garbage.
 3. **Payoff:** the decoded text continues the story and contains an **ACCESS PHRASE**.
-4. **Submit:** the team types the access phrase on their page. It shows up in your **Submissions** queue and you approve it. Approval opens the next file.
+4. **Submit:** the team types the access phrase on their page. **The page checks it automatically.** A correct phrase opens the next file at once ("ACCESS GRANTED"). A wrong one shows "ACCESS DENIED, try again". After three wrong tries in a row the box locks for a few seconds. Capitals, spaces and punctuation do not matter.
 
 Stage 5 is the vault fragment. Its lock needs **the first key and the second key joined together** (the Vigenere keyword) and **the number from the third file** (the ROT13 Amount), so teams that kept good notes get through. It has seven layers. Its access phrase is "FRAGMENT n".
 
@@ -30,15 +30,15 @@ The site never tells teams how many layers a file has. Only the paid hints do.
 
 The console shows each key and how it is found, so you can judge answers on the spot. The file `host-answer-key.md` has the whole list on one page (private, not committed).
 
-## Live delivery (automatic)
+## How the checking works (no admin needed)
 
-When you press a button in the console (Start, Approve, Release hint, Open the vault, Reveal, Broadcast, Reset), the console sends a **signed message** over a free public channel ([ntfy.sh](https://ntfy.sh)). Every team page listens and reacts on its own: stages and hints unlock, broadcasts appear as a banner, and a reset sends every team back to the start. No typing needed.
+Each file is encrypted with a key made from the **previous file's access phrase**. Typing the right phrase decrypts the next file in the team's own browser; a wrong phrase simply fails. Nothing is sent to anyone to be checked, so there is no approval step and no code to read out. The console cannot see or change a team's answers; it only **monitors**.
 
-- Team pages show **LIVE** (green) when connected and **OFFLINE** (red) when not. The console shows "LIVE: sent <time>" after each send.
-- Messages from the console are signed with a key that only the admin console holds, so a participant can't fake a reset. The codes sent are still useless outside the team they belong to.
-- Teams send their submissions to the console over a second channel. These are not signed, but nothing happens until you approve them.
-- Messages are kept for about 12 hours, so a phone that joins late or reconnects catches up by itself.
-- It needs internet access to ntfy.sh. **If it is blocked or down, everything still works by hand:** the console still shows each code, and teams type it into the Clearance code box (or the Hint key box).
+- **Teams to console:** every team page reports its progress (stage reached, hints used, flag found) to the console over a free public channel ([ntfy.sh](https://ntfy.sh)). The console shows it live, calculates scores, and the projector follows. These reports are not signed, so a participant could fake one for the scoreboard. Nothing in the game depends on them.
+- **Console to teams:** Start, Broadcast, Reset, team renames, "Grant access" and the vault opening go to the team pages over the same service, signed with a key only the console holds, so nobody can fake a reset.
+- A device that joins late or reconnects catches up on its own (messages are kept for about 12 hours).
+- **Offline:** the answer checking works with no internet at all. Only the live parts need ntfy.sh: if a team page shows OFFLINE, ask them to type the START code shown in the console and use "Grant access" if they get stuck.
+- **A note on the secrecy:** because answers are keys, someone willing to extract `data.js` and run a guessing program could in theory try words offline. Each guess costs about 0.1 seconds of computing, which is plenty for a workshop.
 
 ## Setup (once, before the event)
 
@@ -63,7 +63,7 @@ You need two windows on the host laptop:
 
 ### 1. Start
 1. Hand each team its join code. They enter it on the landing page.
-2. Press **START GAME**. Stage 1 appears on every team page by itself. The console also shows the **START code**, which teams can type into the Clearance code box if a page shows OFFLINE.
+2. Press **START GAME**. Every team's first case file opens by itself with a mission briefing. (The START code is also shown in the console as an offline fallback.)
 
 ### Team names
 
@@ -71,27 +71,20 @@ Teams are called Team Alpha, Bravo and so on by default. To rename them, type th
 
 ### 2. Each stage
 
-1. A team reads its dossier, solves the riddle, decodes the locked file in CyberChef and **submits the access phrase** on its page.
-2. The submission appears at the top of your console under **Submissions**, with the team, the stage, what they typed and whether it matches the expected answer.
-3. Press **APPROVE** (or **Reject**, and the team sees "not accepted, try again"). Approving unlocks the next file on that team's devices by itself, with a story screen and an **OPEN CASE FILE** button.
-4. **Dismiss** removes a stale submission (for example a second submission after you already approved the stage).
-
-You can still press **VERIFY & UNLOCK** in the selected team's panel without waiting for a submission. If a team page shows OFFLINE, they can tell you in person and you press Verify, then read them the code shown in the console.
+Nothing to do. Teams read, solve and submit; the page checks the phrase; the next file opens. Watch the team table, the stage timers and the event log in the console. **Grant access (override)** in the selected team's panel opens the next file for a team that is stuck.
 
 ### 3. Hints
-1. Press **Release hint 1** (or 2) for the team. The console shows an amber **HINT KEY**.
-2. The hint appears on the team's page by itself and its cost comes off their score straight away. If their page is OFFLINE, give them the key to enter in the **Hints panel** (the box with the lightbulb).
 
-Hint 1 costs 25% of the stage's points and hint 2 another 25%. A stage never scores below 25.
+Teams buy hints themselves: a **Reveal hint** button on their page (click twice to confirm) shows the hint and takes 25% of the stage's points (a second hint takes another 25%, and a stage never drops below 25 points). The console shows the hints used and updates the score.
 
 ### 4. The vault
 
 When a team finishes stage 5 it gets one **vault fragment** and one **recipe step**. Each team only sees its own piece, so they have to find the other teams.
 
-1. Press **Open the vault**. Every team page jumps to a separate **Vault page** (safe, five fragment slots, the recipe pipeline and a "break the vault" box). If a page is OFFLINE, read out the **VAULT code** and they enter it in the code box.
+1. When all five teams have finished, the console **opens the vault by itself** (or press **Open the vault** to do it earlier). Every team page jumps to a separate **Vault page** (safe, five fragment slots, the recipe pipeline and a "break the vault" box).
 2. Teams join the five fragments in order 1 to 5 with no spaces, then apply the five recipe steps in order 1 to 5 in CyberChef.
-3. The first team to decode the message submits the **flag** (`GDG{...}`) on its vault page. It appears in your Submissions queue. **APPROVE** gives the bonus: +200, +100, +50 in the order you approve.
-4. Press **Reveal final answer**. The projector plays the reveal and every vault page shows the message and "CASE CLOSED".
+3. The team that decodes the message types the **flag** (`GDG{...}`) on its vault page. A right flag opens the final message for that team at once, and the console gives the bonus in order: +200, +100, +50.
+4. Press **Reveal final answer** when you want everyone, and the projector, to see it. The projector plays the reveal and every vault page shows the message and "CASE CLOSED".
 
 ### Other controls
 - **Projector vault view:** the projector shows the standings on the left and the vault on the right: a safe, five fragment slots that light up as teams finish stage 5, and the five recipe steps. When you open the vault it shows the instruction to join the fragments 1 to 5 and apply the steps 1 to 5. On **Reveal** the safe door swings open and the message and flag appear. Press **V** on the projector to show the vault full screen.
@@ -122,7 +115,7 @@ To wipe **every** device at once (for example between a test run and the real ev
 ## Troubleshooting
 
 - **Changes don't show after a push:** wait two minutes, then hard-refresh with Cmd+Shift+R. Check the Actions tab for a green check.
-- **"ERR: code rejected":** codes are case-insensitive but must match exactly. Check you are reading from the right team's list in the console, and that a hint key goes in the Hints panel.
+- **A team keeps getting "ACCESS DENIED":** check the exact access phrase in the console (the selected team's panel shows it). Capitals, spaces and punctuation do not matter. If they are stuck, press **Grant access (override)**.
 - **Projector not updating:** make sure it is open in the same browser as the admin console, not on another device. The projector does not use the live channel.
 - **A team page shows OFFLINE:** the device can't reach ntfy.sh (venue Wi-Fi may block it). Use the manual codes shown in the console.
 - **Forgot the passcode:** rebuild with a new one. This regenerates all codes, so do it before the event.
