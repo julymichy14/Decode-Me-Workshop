@@ -420,3 +420,13 @@ body[data-view=vault] .cork{opacity:.5}
 .anote{border-left:2px solid var(--grn);background:#A3E6350d;padding:8px 10px;font:12px/1.5 var(--mono);color:var(--tx);animation:in .6s}
 .anote b{display:block;color:var(--grn);letter-spacing:.1em;font-size:11px;margin-bottom:2px}
 .fragpanel .frag{font-size:14px}
+
+/* fragments on the projector */
+.slots.v .slot{grid-template-columns:11vw 1fr auto}
+.slots.v .slot .fragtxt{grid-column:1/-1;display:block;font:1.05vw/1.35 var(--mono);color:var(--cy);word-break:break-all;margin-top:.2vw}
+
+.hasfr .safebig{width:min(8vw,100%)!important;margin:.2vw auto 0}
+.hasfr .vcount{font-size:1.2vw;margin-bottom:.5vw}
+.hasfr .slots.v .slot{padding:.45vw .8vw;font-size:1.1vw}
+.hasfr .slots.v .slot .fragtxt{font-size:.95vw}
+.hasfr .pipe2{margin-top:.5vw}

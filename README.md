@@ -26,7 +26,7 @@ Each team investigates one hacked system through five **case files**. A case fil
 
 **Team notes write themselves.** Each time a team solves a file, its Team Notes panel gets an automatic entry with the key, how the key was found, the access phrase and anything worth remembering for later (for example the callback item needed in file 4, and the reminder about how the last lock is built). Teams also have a box for their own notes.
 
-After file 5 the team's vault fragment and recipe step live in a separate **My Fragment** page (linked in the top bar), not on the case-file page.
+After file 5 the team's vault fragment and recipe step live in a separate **My Fragment** page (linked in the top bar), not on the case-file page. There the team **transmits its fragment**: it pastes the fragment and types its recipe step, the page checks both (a mistake shows ACCESS DENIED), and the piece goes to the vault screen.
 
 Stage 5 is the vault fragment. Its lock needs **the first key and the second key joined together** (the Vigenere keyword) and **the number from the third file** (the ROT13 Amount), so teams that kept good notes get through. It has seven layers. Its access phrase is "FRAGMENT n".
 
@@ -83,12 +83,15 @@ Teams buy hints themselves: a **Reveal hint** button on their page (click twice 
 
 ### 4. The vault
 
-When a team finishes stage 5 it gets one **vault fragment** and one **recipe step**. Each team only sees its own piece, so they have to find the other teams.
+When a team finishes stage 5 it gets one **vault fragment** and one **recipe step** on its **My Fragment** page.
 
-1. When all five teams have finished, the console **opens the vault by itself** (or press **Open the vault** to do it earlier). Every team page jumps to a separate **Vault page** (safe, five fragment slots, the recipe pipeline and a "break the vault" box).
-2. Teams join the five fragments in order 1 to 5 with no spaces, then apply the five recipe steps in order 1 to 5 in CyberChef.
-3. The team that decodes the message types the **flag** (`GDG{...}`) on its vault page. A right flag opens the final message for that team at once, and the console gives the bonus in order: +200, +100, +50.
-4. Press **Reveal final answer** when you want everyone, and the projector, to see it. The projector plays the reveal and every vault page shows the message and "CASE CLOSED".
+1. Each team **transmits** its fragment from that page. It appears in your console under **Vault assembly** and on the projector, in the slot for its position. The console only accepts a team's real fragment.
+2. When all five teams have finished, the vault also opens by itself (or press **Open the vault** earlier) and every team page jumps to a separate **Vault page**.
+3. When five fragments are on the screen, use the buttons under **Vault assembly**: **Copy fragments joined (1→5)**, **Copy recipe**, or **Open in CyberChef, ready to decode**, which opens CyberChef with the five steps in order and the joined fragments already loaded. Decode it with everyone watching.
+4. The message contains the flag (`GDG{...}`). The first team to type it on its vault page gets the bonus: +200, +100, +50 in order.
+5. Press **Reveal final answer** to play the reveal on the projector and every vault page.
+
+The projector shows the standings on the left and the vault on the right. Press **V** on the projector for a vault-only view.
 
 ### Other controls
 - **Projector vault view:** the projector shows the standings on the left and the vault on the right: a safe, five fragment slots that light up as teams finish stage 5, and the five recipe steps. When you open the vault it shows the instruction to join the fragments 1 to 5 and apply the steps 1 to 5. On **Reveal** the safe door swings open and the message and flag appear. Press **V** on the projector to show the vault full screen.

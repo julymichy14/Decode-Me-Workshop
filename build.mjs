@@ -53,7 +53,7 @@ src.teams.forEach((t, i) => { if (customNames[i]) t.name = customNames[i]; });
 for (const t of src.teams) {
   const joinCode = t.id.toUpperCase() + '-' + rnd(3);
   const blobs = {};
-  const at = { name: t.name, joinCode, fragment_position: t.fragment_position, stages: [] };
+  const at = { name: t.name, joinCode, fragment_position: t.fragment_position, fragment: t.fragment, vault_recipe_step: t.vault_recipe_step, vault_recipe_label: t.vault_recipe_label, stages: [] };
   const codes = t.stages.map((s) => `${t.id}:${s.n}:${s.answer}`); // passphrase that opens whatever comes after stage n
   for (const s of t.stages) {
     const p = { n: s.n, title: s.title, file: s.file, points: s.points, layers: s.layers, docs: s.docs, hints: s.hints, encoded: s.encoded };

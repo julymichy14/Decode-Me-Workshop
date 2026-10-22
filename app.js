@@ -15,7 +15,7 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // a rebuilt data.js is a new game: forget every team session, entered code, note and admin state
 try {
   if (localStorage.getItem('dmc_build') !== D.salt) {
-    Object.keys(localStorage).filter((k) => /^dmc_(team|codes_|notes_|admin|names|hints_)/.test(k)).forEach((k) => localStorage.removeItem(k));
+    Object.keys(localStorage).filter((k) => /^dmc_(team|codes_|notes_|admin|names|hints_|frag_)/.test(k)).forEach((k) => localStorage.removeItem(k));
     localStorage.setItem('dmc_build', D.salt);
   }
 } catch {}
@@ -96,6 +96,16 @@ async function liveSubmit(obj) { // teams -> admin: unsigned, the admin console 
 }
 
 /* ---------- shared helpers ---------- */
+function cyberchefUrl(labels, input) {
+  const op = (l) => {
+    if (l === 'From Base64') return "From_Base64('A-Za-z0-9%2B/%3D',true,false)";
+    if (l === 'From Hex') return "From_Hex('Auto')";
+    if (l === 'From Base32') return "From_Base32('A-Z2-7%3D',true)";
+    if (l === 'Reverse') return "Reverse('Character')";
+    const m = /^ROT13 \(Amount (\d+)\)$/.exec(l); return m ? `ROT13(true,true,false,${m[1]})` : '';
+  };
+  return 'https://gchq.github.io/CyberChef/#recipe=' + labels.map(op).join('') + '&input=' + btoa(input).replace(/=+$/, '');
+}
 const hintCost = (pts) => Math.round(pts * 0.25 / 5) * 5;
 const stagePts = (pts, hints) => Math.max(25, pts - hints * hintCost(pts));
 const fmt = (ms) => { ms = Math.max(0, ms); const s = Math.floor(ms / 1000); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
@@ -295,6 +305,7 @@ async function teamView(id, pageArg) {
   let hintsUsed = ls.get('dmc_hints_' + id, {}); // hints this team has revealed: {stage: count}
   let denied = null;                              // last wrong answer {kind, n, text, count, until}
   let fails = 0, hintArm = 0, revealTyped = false, typer = null;
+  let fragSent = ls.get('dmc_frag_' + id, false);
   async function tryKey(key, only) {
     const fresh = [];
     for (const k of Object.keys(blobs)) {
@@ -318,7 +329,7 @@ async function teamView(id, pageArg) {
 
   const setPage = (p) => { page = p === 'vault' || p === 'fragment' ? p : 'main'; setView(page === 'vault' ? 'vault' : 'team'); render(); window.scrollTo(0, 0); };
   const go = (p) => { const h = '#/team/' + id + (p === 'vault' || p === 'fragment' ? '/' + p : ''); if (location.hash === h) setPage(p); else location.hash = h; };
-  const wipe = () => { Object.keys(got).forEach((k) => delete got[k]); ls.set(codeKey, []); localStorage.removeItem('dmc_notes_' + id); sel = 1; hmsg = ''; msg = ''; restartCode = ''; bcast = null; brief = null; hintsUsed = {}; ls.set('dmc_hints_' + id, {}); denied = null; fails = 0; revealTyped = false; if (page !== 'main') { page = 'main'; setView('team'); location.hash = '#/team/' + id; } };
+  const wipe = () => { Object.keys(got).forEach((k) => delete got[k]); ls.set(codeKey, []); localStorage.removeItem('dmc_notes_' + id); sel = 1; hmsg = ''; msg = ''; restartCode = ''; bcast = null; brief = null; hintsUsed = {}; ls.set('dmc_hints_' + id, {}); denied = null; fails = 0; revealTyped = false; fragSent = false; ls.set('dmc_frag_' + id, false); if (page !== 'main') { page = 'main'; setView('team'); location.hash = '#/team/' + id; } };
   function afterUnlock(fresh) {
     const stg = fresh.filter((k) => /^s\d$/.test(k)).map((k) => +k[1]);
     if (fresh.includes('done')) { sel = 5; brief = { n: 6 }; } else if (stg.length) { sel = Math.max(...stg); brief = { n: sel }; }
@@ -515,10 +526,22 @@ async function teamView(id, pageArg) {
         <div class="term"><div class="th"><span class="fn">vault_fragment.key</span><button class="copy" data-copy2>COPY</button></div><div class="body">
           <div class="lbl">FRAGMENT ${d.fragment_position} OF 5</div><div class="mono cy frag">${esc(d.fragment)}</div>
           <div class="lbl" style="margin-top:14px">RECIPE STEP ${d.step} OF 5</div><div class="mono grn" style="font-size:18px">${esc(d.label)}</div></div></div>
-        <p class="dim">When all five teams have their pieces, the vault opens by itself. You will then join the five fragments in order 1 to 5 and apply the five recipe steps in order 1 to 5 in CyberChef.</p>
+        <div class="lbl sec">// TRANSMIT TO THE VAULT SCREEN</div>
+        <p>Send your fragment and your recipe step to the big screen, so that the host and all five teams can decode them together. Paste your fragment from the box above and type your recipe step exactly as it is written.</p>
+        <form id="sf"><textarea class="f" id="sfrag" rows="3" placeholder="paste your fragment here" style="width:100%"></textarea><div class="prompt" style="margin-top:8px"><input id="sstep" autocomplete="off" spellcheck="false" placeholder="your recipe step"><button class="btn">TRANSMIT</button></div></form>
+        <div class="sstat">${fragSent ? '<span class="grn">TRANSMITTED. Your fragment is on the vault screen.</span>' : '<span class="dim">Nothing sent yet.</span>'}</div>
+        <p class="dim">When all five teams have transmitted, the pieces are joined in order 1 to 5 and the five steps are applied in order 1 to 5 in CyberChef.</p>
         ${got.vault ? `<a class="btn big" style="display:inline-block;opacity:1;text-decoration:none" href="#/team/${id}/vault">GO TO THE VAULT →</a>` : '<p class="am mono">Waiting for the other teams<span class="cur"></span></p>'}</div></main>`;
     $app.querySelectorAll('[data-copy2]').forEach((b) => (b.onclick = () => copyText(d.fragment, b)));
     $app.querySelector('#out').onclick = () => localStorage.removeItem('dmc_team');
+    $app.querySelector('#sf').onsubmit = (ev) => {
+      ev.preventDefault();
+      const deny = (m) => flash('ACCESS DENIED', 'deny', m);
+      if ($app.querySelector('#sfrag').value.replace(/\s+/g, '') !== d.fragment) return deny('That is not your fragment. Copy it from the box above, exactly.');
+      if (norm($app.querySelector('#sstep').value) !== norm(d.label)) return deny('That is not your recipe step. Type it exactly as written above.');
+      liveSubmit({ id: uid(), t: 'fragment', team: id, text: d.fragment, ts: Date.now() }).catch(() => {});
+      fragSent = true; ls.set('dmc_frag_' + id, true); flash('FRAGMENT TRANSMITTED'); render();
+    };
   }
 
   function renderVault() {
@@ -560,7 +583,7 @@ async function teamView(id, pageArg) {
 
 /* ---------- admin ---------- */
 const AKEY = 'dmc_admin';
-const freshState = () => ({ startedAt: null, pausedAt: null, pausedTotal: 0, vaultOpen: false, revealed: null, bonus: [], broadcast: null, announce: null, events: [], subs: {}, teams: Object.fromEntries(D.teams.map((t) => [t.id, { stage: 0, stageStart: null, verifiedAt: [], hints: {}, last: null, hold: false }])) });
+const freshState = () => ({ startedAt: null, pausedAt: null, pausedTotal: 0, vaultOpen: false, revealed: null, bonus: [], broadcast: null, announce: null, events: [], subs: {}, frags: {}, teams: Object.fromEntries(D.teams.map((t) => [t.id, { stage: 0, stageStart: null, verifiedAt: [], hints: {}, last: null, hold: false }])) });
 const loadS = () => ls.get(AKEY, null) || freshState();
 const saveS = (s) => ls.set(AKEY, s);
 const teamScore = (S, A, id) => {
@@ -625,6 +648,14 @@ async function adminView() {
     if (!S.vaultOpen && D.teams.every((t) => S.teams[t.id].stage === 6)) { act((S2) => { S2.vaultOpen = true; S2.announce = { label: 'VAULT CODE (all teams)', code: A.vaultCode }; log(S2, 'All five teams finished: the vault opened automatically'); }); return; }
     softRender();
   }
+  function applyFragment(b) {
+    const S = loadS(), tm = A.teams[b.team]; if (!tm || b.text !== tm.fragment) return; // only a team's true fragment is accepted
+    S.frags = S.frags || {};
+    const pos = tm.fragment_position; if (S.frags[pos] && S.frags[pos].text === b.text) return;
+    S.frags[pos] = { team: b.team, text: tm.fragment, step: tm.vault_recipe_step, label: tm.vault_recipe_label, ts: b.ts };
+    log(S, `${tm.name} transmitted fragment ${pos} to the vault screen`);
+    saveS(S); softRender();
+  }
   function applyFlag(b) {
     const S = loadS(); const tm = A.teams[b.team]; if (!tm || S.bonus.includes(b.team)) return;
     if (S.bonus.length < 3) S.bonus.push(b.team);
@@ -635,7 +666,7 @@ async function adminView() {
   const softRender = () => { const a = document.activeElement; if (!a || !/INPUT|TEXTAREA/.test(a.tagName)) render(); };
   const stopSubs = liveSubscribe((b) => {
     if (!b || !b.team || !b.ts || b.ts < resetAt()) return;
-    if (b.t === 'progress') applyProgress(b); else if (b.t === 'flag') applyFlag(b);
+    if (b.t === 'progress') applyProgress(b); else if (b.t === 'flag') applyFlag(b); else if (b.t === 'fragment') applyFragment(b);
   }, (ok) => { qState = ok ? 'live' : 'offline'; const e = document.getElementById('qstate'); if (e) { e.className = ok ? 'grn' : 'red'; e.textContent = ok ? '● LISTENING TO TEAMS' : '● OFFLINE'; } }, { suffix: '-s', raw: true });
 
   function render() {
@@ -664,6 +695,10 @@ async function adminView() {
         <div class="actions"><button class="btn ghost" id="verify">Grant access (override)</button></div>`;
     }
     const issuedHtml = '';
+    const assembled = Object.keys(S.frags || {}).map(Number).sort().map((p) => ({ pos: p, ...S.frags[p] }));
+    const joined = assembled.map((f) => f.text).join('');
+    const recipeLabels = assembled.length === 5 ? [...assembled].sort((a, b) => a.step - b.step).map((f) => f.label) : [];
+    const ccUrl = assembled.length === 5 ? cyberchefUrl(recipeLabels, joined) : '';
     const slots = [1, 2, 3, 4, 5].map((p) => {
       const t = D.teams.find((x) => x.name === D.holders[p]);
       const on = t && S.teams[t.id].stage === 6;
@@ -682,6 +717,8 @@ async function adminView() {
     <div class="panel queue"><div class="lbl">// AUTOMATIC MODE <span id="qstate" class="${qState === 'live' ? 'grn' : 'red'}">${qState === 'live' ? '● LISTENING TO TEAMS' : '● ' + qState.toUpperCase()}</span></div><p class="dim" style="margin:6px 0 0">Teams check their own answers: a correct access phrase opens the next file by itself. This console only monitors progress. The vault opens automatically when all five teams finish. Use "Grant access" only if a team is stuck or offline.</p></div>
     ${S.announce && !S.announce.hidden ? (S.announce.kind === 'hint' ? `<div class="panel hintann" style="padding:12px 16px;margin-bottom:16px"><span class="lbl am">${BULB} HINT KEY · ${esc(S.announce.label)}</span><br><span class="codebox">${esc(S.announce.code)}</span><span class="dim mono" style="font-size:12px"> &nbsp;give this to the team, they enter it in their Hints panel</span></div>` : `<div class="panel" style="padding:12px 16px;margin-bottom:16px"><span class="lbl">// READ OUT NOW · ${esc(S.announce.label)}</span><br><span class="codebox">${esc(S.announce.code)}</span></div>`) : ''}
     <div class="adm"><div class="panel" style="padding:8px"><table><tr><th>TEAM</th><th>STAGES</th><th>#</th><th>TIME</th><th>HINTS</th><th>SCORE</th><th>LAST</th></tr>${rows}</table>
+      <div class="gap" style="padding:8px"><div class="lbl">// VAULT ASSEMBLY · ${assembled.length} / 5 FRAGMENTS ON THE SCREEN</div>${assembled.length ? `<div class="mono" style="font-size:12px;margin:6px 0;word-break:break-all">${assembled.map((f) => `<div><b class="grn">${f.pos}</b> ${esc(A.teams[f.team].name)} · STEP ${f.step}: ${esc(f.label)}<br><span class="cy">${esc(f.text)}</span></div>`).join('')}</div>` : '<p class="dim" style="margin:6px 0">Teams transmit their fragment from their My Fragment page. It appears here and on the projector.</p>'}
+        <div class="actions"><button class="btn ghost" id="copyjoin" ${assembled.length ? '' : 'disabled'}>Copy fragments joined (1→5)</button><button class="btn ghost" id="copyrec" ${assembled.length === 5 ? '' : 'disabled'}>Copy recipe</button>${assembled.length === 5 ? `<a class="btn" style="text-decoration:none" target="_blank" rel="noopener" href="${esc(ccUrl)}">Open in CyberChef, ready to decode</a>` : ''}</div></div>
       <div class="gap" style="padding:8px"><div class="lbl">// VAULT TRACKER</div><div class="mono" style="font-size:13px;margin-top:6px">${slots}</div>
       <div class="actions"><span class="lbl" style="align-self:center">FLAG BONUS</span>${D.teams.map((t) => `<button class="btn ghost bonus" data-t="${t.id}" ${S.bonus.includes(t.id) || S.bonus.length >= 3 ? 'disabled' : ''}>${esc(t.name.replace('Team ', ''))}</button>`).join('')}</div>
       <div class="lbl" style="margin-top:10px">JOIN CODES</div><div class="mono" style="font-size:12px">${joins}</div>
@@ -699,6 +736,8 @@ async function adminView() {
       const map = {}; nf.querySelectorAll('.nm').forEach((i) => { if (i.value.trim()) map[i.dataset.id] = i.value.trim(); });
       ls.set('dmc_names', map); applyNames(map); syncA(); pub({ t: 'names', names: map }); render();
     };
+    on('#copyjoin', () => copyText(joined, $('#copyjoin')));
+    on('#copyrec', () => copyText(recipeLabels.map((l, i) => `${i + 1}. ${l}`).join('\n'), $('#copyrec')));
     on('#bcb', () => { const v = $('#bc').value.trim(); if (v) { pub({ t: 'bcast', text: v }); act((S) => { S.broadcast = { text: v, t: Date.now() }; log(S, 'Broadcast: ' + v); }); } });
     on('#vault', () => act((S) => { S.vaultOpen = true; S.announce = { label: 'VAULT CODE (all teams)', code: A.vaultCode }; log(S, 'Vault opened'); }));
     on('#reveal', () => act((S) => { S.revealed = { plaintext: A.vaultPlain, flag: A.flag, t: Date.now() }; S.announce = { label: 'REVEAL (sent to all teams)', code: A.revealCode, hidden: true }; log(S, 'Final answer revealed'); }));
@@ -724,11 +763,13 @@ function screenView() {
     const rows = rank.map(({ t, x, sc }) => `<div class="trow"><div>${esc(t.name.toUpperCase())}</div><div class="cells">${[1, 2, 3, 4, 5].map((n) => `<div class="cell ${x.stage > n ? 'd' : x.stage === n ? 'a' : ''}">${x.stage > n ? '✓' : x.stage === n ? '●' : '🔒'}</div>`).join('')}</div><div class="score">${sc}</div></div>`).join('');
     const held = [1, 2, 3, 4, 5].map((p) => { const t = D.teams.find((x) => x.name === D.holders[p]); return { p, t, on: !!t && S.teams[t.id].stage === 6 }; });
     const earned = held.filter((h) => h.on).length;
-    const slots = held.map(({ p, t, on }) => `<div class="slot ${on ? 'on' : ''}"><span>FRAGMENT_0${p}</span><b>${on ? 'HELD BY ' + esc(t.name.toUpperCase()) : '[ REDACTED ]'}</b><i>0x${((p - 1) * 0x56).toString(16).padStart(2, '0')}</i></div>`).join('');
-    const pipe = [1, 2, 3, 4, 5].map((n) => `<span class="${n <= earned ? 'on' : ''}">STEP_0${n}</span>`).join('<em>→</em>');
-    const state = S.revealed ? 'UNLOCKED' : S.vaultOpen ? 'OPEN FOR DECRYPTION' : earned === 5 ? 'ALL FRAGMENTS HELD' : 'SEALED';
-    const vault = `<div class="vaultbox ${S.vaultOpen ? 'vopen' : ''} ${S.revealed ? 'vrev' : ''}"><div class="vhead"><span class="lbl">// THE VAULT</span><span class="vstate">${state}</span></div>
-      ${SAFE_BIG}<div class="vcount">${earned} / 5 FRAGMENTS RECOVERED</div><div class="slots v">${slots}</div><div class="pipe2">${pipe}</div>
+    const frags = S.frags || {}, nfr = Object.keys(frags).length;
+    const slots = held.map(({ p, t, on }) => { const fr = frags[p]; return `<div class="slot ${on || fr ? 'on' : ''}"><span>FRAGMENT_0${p}</span><b>${fr || on ? 'HELD BY ' + esc((fr ? D.teams.find((x) => x.id === fr.team) : t).name.toUpperCase()) : '[ REDACTED ]'}</b><i>0x${((p - 1) * 0x56).toString(16).padStart(2, '0')}</i>${fr ? `<code class="fragtxt">${esc(fr.text)}</code>` : ''}</div>`; }).join('');
+    const stepOf = {}; Object.values(frags).forEach((f) => (stepOf[f.step] = f.label));
+    const pipe = [1, 2, 3, 4, 5].map((n) => `<span class="${stepOf[n] ? 'on' : ''}">STEP_0${n}${stepOf[n] ? ' ' + esc(stepOf[n]) : ''}</span>`).join('<em>→</em>');
+    const state = S.revealed ? 'UNLOCKED' : S.vaultOpen ? 'OPEN FOR DECRYPTION' : nfr === 5 ? 'ALL FIVE FRAGMENTS RECEIVED' : earned === 5 ? 'ALL FRAGMENTS HELD' : 'SEALED';
+    const vault = `<div class="vaultbox ${S.vaultOpen ? 'vopen' : ''} ${S.revealed ? 'vrev' : ''} ${nfr ? 'hasfr' : ''}"><div class="vhead"><span class="lbl">// THE VAULT</span><span class="vstate">${state}</span></div>
+      ${SAFE_BIG}<div class="vcount">${nfr} / 5 FRAGMENTS ON THE SCREEN</div><div class="slots v">${slots}</div><div class="pipe2">${pipe}</div>
       ${S.vaultOpen && !S.revealed ? `<div class="vinst">JOIN THE FRAGMENTS 1 → 5 · APPLY THE STEPS 1 → 5 IN CYBERCHEF</div>` : ''}
       ${S.revealed ? `<div class="reveal"><div id="rt" class="grn"></div><div class="flagline" id="fl" style="visibility:hidden">${esc(S.revealed.flag)}</div><div class="closed" id="cc" style="visibility:hidden">CASE CLOSED</div></div>` : ''}</div>`;
     $app.innerHTML = `<div class="scr"><div class="scrtop"><h1>&gt;_ DECODE ME IF YOU CAN</h1><div class="clock">${clock}${S.pausedAt ? ' · PAUSED' : ''}</div></div>
