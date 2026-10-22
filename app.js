@@ -115,9 +115,9 @@ function termBox(fn, lines, raw) {
   <div class="cmd"><span class="p">$</span> <span class="cur"></span></div></div>`;
 }
 function wireCopy(root, raw) { root.querySelectorAll('[data-copy]').forEach((b) => (b.onclick = () => copyText(raw, b))); }
-function flash(text) {
-  const f = document.createElement('div'); f.className = 'flash'; f.innerHTML = `<div>${esc(text)}</div>`;
-  document.body.appendChild(f); setTimeout(() => f.remove(), 1400);
+function flash(text, kind, sub) {
+  const f = document.createElement('div'); f.className = 'flash' + (kind ? ' ' + kind : ''); f.innerHTML = `<div>${esc(text)}${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
+  document.body.appendChild(f); setTimeout(() => f.remove(), kind === 'deny' ? 1900 : 1400);
 }
 setInterval(() => {
   document.querySelectorAll('[data-since]').forEach((e) => {
@@ -363,6 +363,7 @@ async function teamView(id, pageArg) {
     fails++;
     denied = { kind, n: c, text, count: fails, until: fails >= 3 ? Date.now() + Math.min(30, 4 * (fails - 2)) * 1000 : 0 };
     render();
+    flash('ACCESS DENIED', 'deny', 'That is not the right ' + (kind === 'flag' ? 'flag' : 'access phrase') + '. Check your decoding and try again.');
     const f = $app.querySelector(kind === 'flag' ? '#ff' : '#af'); if (f) { f.classList.add('shake'); }
     if (denied.until) setTimeout(() => { if (denied && denied.until <= Date.now() + 50) render(); }, denied.until - Date.now() + 100);
   }

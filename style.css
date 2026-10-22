@@ -409,3 +409,8 @@ html.nofx .story p,html.nofx .btn.big{opacity:1}
 .reveal2 .closed{font:700 40px var(--sans);color:var(--grn)}
 body[data-view=vault] .cork{opacity:.5}
 @media (max-width:900px){.vgrid{grid-template-columns:1fr}.vbox{position:static}.vslot{grid-template-columns:1fr}.how span{display:block}}
+
+/* access denied window */
+.flash.deny{background:#0B0E11e6;animation:fl 1.9s forwards}
+.flash.deny div{color:var(--red);border-color:var(--red);box-shadow:0 0 60px #F0717844,inset 0 0 40px #F0717822;text-align:center;animation:shake .45s}
+.flash small{display:block;margin-top:14px;font:400 15px/1.5 var(--sans);letter-spacing:0;color:var(--tx2);max-width:34ch}
