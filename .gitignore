@@ -1,2 +1,5 @@
 challenges.json
 node_modules
+challenges.original.json
+generate-challenges.mjs
+host-answer-key.md

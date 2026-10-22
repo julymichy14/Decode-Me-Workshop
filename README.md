@@ -15,12 +15,28 @@ The site is static (GitHub Pages, no server). Every locked stage, hint and the v
 | `#/admin` | Host only | Control console. Needs the admin passcode. |
 | `#/screen` | Projector | Standings and the vault board. |
 
+## The cases
+
+Each team investigates one hacked system through five **case files**. A case file works like this:
+
+1. **Dossier (readable):** the team reads plain-text evidence in the story: emails, logs, notes. Hidden in it is a **riddle or puzzle** whose answer is the **KEY**. The puzzles vary: a riddle, a Morse or A1Z26 or Atbash or hex-ASCII line, an acrostic, a bit of arithmetic, or a callback to something in an earlier file.
+2. **Locked file (encoded):** the key is needed to open the encoded file in [CyberChef](https://gchq.github.io/CyberChef/). The file has several layers (Base64, Hex, Base32, Binary, Decimal, Reverse, URL, ROT13 with an Amount) and a **keyed lock** (Vigenere, XOR or Rail Fence). Without the right key the output is garbage.
+3. **Payoff:** the decoded text continues the story and contains an **ACCESS PHRASE**.
+4. **Submit:** the team types the access phrase on their page. It shows up in your **Submissions** queue and you approve it. Approval opens the next file.
+
+Stage 5 is the vault fragment. Its lock needs **the first key and the second key joined together** (the Vigenere keyword) and **the number from the third file** (the ROT13 Amount), so teams that kept good notes get through. It has seven layers. Its access phrase is "FRAGMENT n".
+
+The site never tells teams how many layers a file has. Only the paid hints do.
+
+The console shows each key and how it is found, so you can judge answers on the spot. The file `host-answer-key.md` has the whole list on one page (private, not committed).
+
 ## Live delivery (automatic)
 
-When you press a button in the console (Start, Verify, Release hint, Open the vault, Reveal, Broadcast, Reset), the console sends a **signed message** over a free public channel ([ntfy.sh](https://ntfy.sh)). Every team page listens and reacts on its own: stages and hints unlock, broadcasts appear as a banner, and a reset sends every team back to the start. No typing needed.
+When you press a button in the console (Start, Approve, Release hint, Open the vault, Reveal, Broadcast, Reset), the console sends a **signed message** over a free public channel ([ntfy.sh](https://ntfy.sh)). Every team page listens and reacts on its own: stages and hints unlock, broadcasts appear as a banner, and a reset sends every team back to the start. No typing needed.
 
 - Team pages show **LIVE** (green) when connected and **OFFLINE** (red) when not. The console shows "LIVE: sent <time>" after each send.
-- Messages are signed with a key that only the admin console holds, so a participant can't fake a reset. The codes sent are still useless outside the team they belong to.
+- Messages from the console are signed with a key that only the admin console holds, so a participant can't fake a reset. The codes sent are still useless outside the team they belong to.
+- Teams send their submissions to the console over a second channel. These are not signed, but nothing happens until you approve them.
 - Messages are kept for about 12 hours, so a phone that joins late or reconnects catches up by itself.
 - It needs internet access to ntfy.sh. **If it is blocked or down, everything still works by hand:** the console still shows each code, and teams type it into the Clearance code box (or the Hint key box).
 
@@ -54,12 +70,13 @@ You need two windows on the host laptop:
 Teams are called Team Alpha, Bravo and so on by default. To rename them, type the new names into **Team names** at the bottom left of the console and press **Save names**. Every team page and the projector update straight away, and the names survive a reset. You can also set them at build time: `TEAM_NAMES="Cyber Owls,Null Pointers,Byte Me,Root Cause,Stack Smashers" ADMIN_PASSCODE=... node build.mjs` (in the order Alpha, Bravo, Charlie, Delta, Echo).
 
 ### 2. Each stage
-1. A team decodes their stage in CyberChef and walks over with the code word.
-2. Open that team in the console. The expected answer is shown big in green, with the decoded text, the CyberChef recipe and both hints.
-3. If it matches, press **VERIFY & UNLOCK**. The console shows a **clearance code**.
-4. The team's page shows **ACCESS GRANTED** with a short story to read, from the intruder NullPhantom, which hides the clue for the next file (amber lines). The team presses **OPEN NEXT FILE** when they are ready. The first screen of the game is a mission briefing with an **OPEN FILE 01** button, and stage 5 ends with a "file recovered" screen. Scores update at the same time. If their page shows OFFLINE, read them the code and they enter it in the Clearance code box.
 
-The "Team said" box is optional. It only shows MATCH or NO MATCH to help you.
+1. A team reads its dossier, solves the riddle, decodes the locked file in CyberChef and **submits the access phrase** on its page.
+2. The submission appears at the top of your console under **Submissions**, with the team, the stage, what they typed and whether it matches the expected answer.
+3. Press **APPROVE** (or **Reject**, and the team sees "not accepted, try again"). Approving unlocks the next file on that team's devices by itself, with a story screen and an **OPEN CASE FILE** button.
+4. **Dismiss** removes a stale submission (for example a second submission after you already approved the stage).
+
+You can still press **VERIFY & UNLOCK** in the selected team's panel without waiting for a submission. If a team page shows OFFLINE, they can tell you in person and you press Verify, then read them the code shown in the console.
 
 ### 3. Hints
 1. Press **Release hint 1** (or 2) for the team. The console shows an amber **HINT KEY**.
@@ -68,12 +85,13 @@ The "Team said" box is optional. It only shows MATCH or NO MATCH to help you.
 Hint 1 costs 25% of the stage's points and hint 2 another 25%. A stage never scores below 25.
 
 ### 4. The vault
-When a team finishes stage 5 they get one **vault fragment** and one **recipe step**. Teams need to find each other. Each team only sees its own piece, so they have to talk.
 
-1. When the teams have their pieces, press **Open the vault**. The vault panel appears on every team page (or read out the **VAULT code** for OFFLINE pages).
-2. They join the five fragments in order 1 to 5 with no spaces, then apply the five recipe steps in order 1 to 5 in CyberChef.
-3. The first team to bring you the flag (`GDG{...}`) gets a bonus. Use the **Flag bonus** buttons: +200, +100, +50 in the order you press them.
-4. Press **Reveal final answer**. The projector plays the reveal and team pages show the message and "CASE CLOSED" (or read out the **REVEAL code** for OFFLINE pages).
+When a team finishes stage 5 it gets one **vault fragment** and one **recipe step**. Each team only sees its own piece, so they have to find the other teams.
+
+1. Press **Open the vault**. Every team page jumps to a separate **Vault page** (safe, five fragment slots, the recipe pipeline and a "break the vault" box). If a page is OFFLINE, read out the **VAULT code** and they enter it in the code box.
+2. Teams join the five fragments in order 1 to 5 with no spaces, then apply the five recipe steps in order 1 to 5 in CyberChef.
+3. The first team to decode the message submits the **flag** (`GDG{...}`) on its vault page. It appears in your Submissions queue. **APPROVE** gives the bonus: +200, +100, +50 in the order you approve.
+4. Press **Reveal final answer**. The projector plays the reveal and every vault page shows the message and "CASE CLOSED".
 
 ### Other controls
 - **Projector vault view:** the projector shows the standings on the left and the vault on the right: a safe, five fragment slots that light up as teams finish stage 5, and the five recipe steps. When you open the vault it shows the instruction to join the fragments 1 to 5 and apply the steps 1 to 5. On **Reveal** the safe door swings open and the message and flag appear. Press **V** on the projector to show the vault full screen.
@@ -117,3 +135,5 @@ To wipe **every** device at once (for example between a test run and the real ev
 - `build.mjs`: turns `challenges.json` into `data.js`.
 - `favicon.svg`: the tab icon.
 - `challenges.json`: the source content with all answers. Keep it private.
+- `generate-challenges.mjs`: writes `challenges.json` from the story text and checks that every encoded file decodes back to its story. To change a story, edit it there, run `node generate-challenges.mjs`, then rebuild `data.js`. (Private, not committed. The original file is kept as `challenges.original.json`.)
+- `host-answer-key.md`: all keys and recipes on one page. Private.

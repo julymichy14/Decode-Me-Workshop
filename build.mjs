@@ -55,7 +55,7 @@ for (const t of src.teams) {
   const at = { name: t.name, joinCode, fragment_position: t.fragment_position, stages: [] };
   const codes = t.stages.map(() => code());
   for (const s of t.stages) {
-    const p = { n: s.n, title: s.title, file: s.file, points: s.points, layers: s.layers, encoded: s.encoded };
+    const p = { n: s.n, title: s.title, file: s.file, points: s.points, layers: s.layers, docs: s.docs, encoded: s.encoded };
     if (s.evidence_extra) p.evidence_extra = s.evidence_extra;
     if (s.n === 1) { p.system = t.system; p.host = t.host; }
     const prev = s.n > 1 ? t.stages[s.n - 2] : null;
@@ -64,7 +64,7 @@ for (const t of src.teams) {
     const hc = [code(), code()];
     for (let k = 0; k < 2; k++) blobs[`h${s.n}_${k + 1}`] = await seal({ text: s.hints[k] }, hc[k]);
     at.stages.push({ n: s.n, title: s.title, file: s.file, points: s.points, encoded: s.encoded, decoded: s.decoded,
-      recipe: s.recipe, answer: s.answer, hints: s.hints, hintCodes: hc,
+      recipe: s.recipe, answer: s.answer, keyNote: s.keyNote, key: s.key, hints: s.hints, hintCodes: hc,
       unlockCode: codes[s.n - 1] }); // read out after verifying this stage
   }
   blobs.done = await seal({

@@ -362,3 +362,50 @@ html.nofx .story p,html.nofx .btn.big{opacity:1}
 .scrkey{position:fixed;right:1vw;bottom:.6vw;font-size:.8vw;opacity:.5}
 
 .btn.big,.brief .btn.big{color:#0B0E11!important;font-weight:700}
+
+.recap p{white-space:pre-wrap}
+.story p{white-space:pre-wrap}
+
+/* ===== case files: dossier + submit ===== */
+.how{border:1px solid var(--bd);background:#0B0E11aa;padding:10px 14px;margin:12px 0 4px;font:13px/1.7 var(--mono);color:var(--tx2)}
+.how b{color:var(--grn);letter-spacing:.1em;margin-right:8px}
+.how span{display:inline-block;margin-right:14px}
+.lbl.sec{margin:22px 0 8px}
+.doc{margin:10px 0;border:1px solid #6b5a3a;background:linear-gradient(160deg,#e8e1cf,#cfc4a6);box-shadow:0 8px 20px #0008;transform:rotate(-.2deg);position:relative}
+.doc:nth-of-type(even){transform:rotate(.25deg)}
+.doc .dh{padding:6px 12px;background:#2b2217;color:#d8c9a3;font:12px var(--mono);letter-spacing:.06em}
+.doc .dbody{margin:0;padding:14px 16px;font:15px/1.6 'Special Elite',var(--mono);color:#26201a;white-space:pre-wrap;word-break:break-word}
+.answer{margin-top:22px}
+.answer .prompt{margin-top:6px;max-width:520px}
+.answer .prompt input{font-size:17px;letter-spacing:.08em}
+.sstat{margin:10px 0 0;font:13px/1.5 var(--mono);min-height:20px}
+.vaultbanner{display:block;margin-bottom:14px;padding:12px 16px;border:1px solid var(--grn);background:#A3E6351a;color:var(--grn);font:700 15px var(--mono);letter-spacing:.06em;text-decoration:none;animation:pulse 2s infinite}
+/* ===== admin queue ===== */
+.queue{padding:14px 16px;margin-bottom:16px;border-color:#56D4DD66}
+.sub{border:1px solid var(--bd);background:#0B0E11cc;padding:10px 12px;margin-top:10px}
+.sub.stale{opacity:.6}
+.sub .sh{font:13px var(--mono)}
+.sub .st{margin:6px 0;font:14px var(--mono)}
+.sub .said{font-size:18px;color:var(--tx);background:#1b222a;padding:2px 8px}
+.sub .actions{margin:8px 0 0}
+/* ===== vault page ===== */
+.vmain{max-width:1200px}
+.vgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:24px;margin-top:14px;align-items:start}
+.vbox{position:sticky;top:60px;background:#0B0E11cc;border:1px solid var(--bd);padding:20px;text-align:center;border-radius:6px}
+.vbox .safebig{width:100%;max-width:360px;margin:0 auto}
+.vstate{margin-top:12px;font:700 18px var(--mono);letter-spacing:.14em;color:var(--am)}
+.vopen .vstate{color:var(--cy)}.vrev .vstate{color:var(--grn)}
+.vpanel{padding:18px;margin-bottom:16px}
+.vslots{display:grid;gap:8px;margin:14px 0}
+.vslot{display:grid;grid-template-columns:130px 1fr auto;gap:12px;align-items:center;border:1px solid var(--bd);padding:8px 12px;font:12px var(--mono);color:#5b6671;background:#0B0E11aa}
+.vslot.on{border-color:var(--grn);color:var(--grn);background:#A3E6350f}
+.vslot b{font-weight:500;word-break:break-all}.vslot i{font-style:normal;color:#4a5561}
+.pipe3{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font:12px var(--mono);color:#5b6671}
+.pipe3 span{border:1px solid var(--bd);padding:4px 8px}.pipe3 span.has{border-color:var(--grn);color:var(--grn)}.pipe3 em{font-style:normal}
+.reveal2{border-color:var(--grn);position:relative;overflow:hidden}
+.reveal2::after{content:"";position:absolute;left:0;right:0;height:6px;background:var(--grn);opacity:.5;top:-10px;animation:sweep 1.4s ease-out}
+.vmsg{font-size:16px;line-height:1.6;min-height:60px}
+.reveal2 .flagline{font:700 24px var(--mono);color:var(--grn);margin:10px 0;word-break:break-all}
+.reveal2 .closed{font:700 40px var(--sans);color:var(--grn)}
+body[data-view=vault] .cork{opacity:.5}
+@media (max-width:900px){.vgrid{grid-template-columns:1fr}.vbox{position:static}.vslot{grid-template-columns:1fr}.how span{display:block}}
