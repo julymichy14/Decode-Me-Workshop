@@ -414,3 +414,9 @@ body[data-view=vault] .cork{opacity:.5}
 .flash.deny{background:#0B0E11e6;animation:fl 1.9s forwards}
 .flash.deny div{color:var(--red);border-color:var(--red);box-shadow:0 0 60px #F0717844,inset 0 0 40px #F0717822;text-align:center;animation:shake .45s}
 .flash small{display:block;margin-top:14px;font:400 15px/1.5 var(--sans);letter-spacing:0;color:var(--tx2);max-width:34ch}
+
+/* automatic team notes */
+.autonotes{display:grid;gap:8px;margin-top:8px;max-height:360px;overflow:auto}
+.anote{border-left:2px solid var(--grn);background:#A3E6350d;padding:8px 10px;font:12px/1.5 var(--mono);color:var(--tx);animation:in .6s}
+.anote b{display:block;color:var(--grn);letter-spacing:.1em;font-size:11px;margin-bottom:2px}
+.fragpanel .frag{font-size:14px}

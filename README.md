@@ -24,6 +24,10 @@ Each team investigates one hacked system through five **case files**. A case fil
 3. **Payoff:** the decoded text continues the story and contains an **ACCESS PHRASE**.
 4. **Submit:** the team types the access phrase on their page. **The page checks it automatically.** A correct phrase opens the next file at once ("ACCESS GRANTED"). A wrong one shows "ACCESS DENIED, try again". After three wrong tries in a row the box locks for a few seconds. Capitals, spaces and punctuation do not matter.
 
+**Team notes write themselves.** Each time a team solves a file, its Team Notes panel gets an automatic entry with the key, how the key was found, the access phrase and anything worth remembering for later (for example the callback item needed in file 4, and the reminder about how the last lock is built). Teams also have a box for their own notes.
+
+After file 5 the team's vault fragment and recipe step live in a separate **My Fragment** page (linked in the top bar), not on the case-file page.
+
 Stage 5 is the vault fragment. Its lock needs **the first key and the second key joined together** (the Vigenere keyword) and **the number from the third file** (the ROT13 Amount), so teams that kept good notes get through. It has seven layers. Its access phrase is "FRAGMENT n".
 
 The site never tells teams how many layers a file has. Only the paid hints do.

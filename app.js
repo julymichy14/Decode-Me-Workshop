@@ -291,7 +291,7 @@ async function teamView(id, pageArg) {
   const codeKey = 'dmc_codes_' + id;
   const got = {}; // unlocked payloads
   let sel = 1, pending = false, msg = '', animKey = '', hmsg = '', restartCode = '', liveOk = false, bcast = null, brief = null;
-  let page = pageArg === 'vault' ? 'vault' : 'main';
+  let page = pageArg === 'vault' || pageArg === 'fragment' ? pageArg : 'main';
   let hintsUsed = ls.get('dmc_hints_' + id, {}); // hints this team has revealed: {stage: count}
   let denied = null;                              // last wrong answer {kind, n, text, count, until}
   let fails = 0, hintArm = 0, revealTyped = false, typer = null;
@@ -316,9 +316,9 @@ async function teamView(id, pageArg) {
     return Math.max(0, s); };
   const recap = (n) => (n < 5 ? got['s' + (n + 1)] : got.done).prev;
 
-  const setPage = (p) => { page = p === 'vault' ? 'vault' : 'main'; setView(page === 'vault' ? 'vault' : 'team'); render(); window.scrollTo(0, 0); };
-  const go = (p) => { const h = '#/team/' + id + (p === 'vault' ? '/vault' : ''); if (location.hash === h) setPage(p); else location.hash = h; };
-  const wipe = () => { Object.keys(got).forEach((k) => delete got[k]); ls.set(codeKey, []); localStorage.removeItem('dmc_notes_' + id); sel = 1; hmsg = ''; msg = ''; restartCode = ''; bcast = null; brief = null; hintsUsed = {}; ls.set('dmc_hints_' + id, {}); denied = null; fails = 0; revealTyped = false; if (page === 'vault') { page = 'main'; setView('team'); location.hash = '#/team/' + id; } };
+  const setPage = (p) => { page = p === 'vault' || p === 'fragment' ? p : 'main'; setView(page === 'vault' ? 'vault' : 'team'); render(); window.scrollTo(0, 0); };
+  const go = (p) => { const h = '#/team/' + id + (p === 'vault' || p === 'fragment' ? '/' + p : ''); if (location.hash === h) setPage(p); else location.hash = h; };
+  const wipe = () => { Object.keys(got).forEach((k) => delete got[k]); ls.set(codeKey, []); localStorage.removeItem('dmc_notes_' + id); sel = 1; hmsg = ''; msg = ''; restartCode = ''; bcast = null; brief = null; hintsUsed = {}; ls.set('dmc_hints_' + id, {}); denied = null; fails = 0; revealTyped = false; if (page !== 'main') { page = 'main'; setView('team'); location.hash = '#/team/' + id; } };
   function afterUnlock(fresh) {
     const stg = fresh.filter((k) => /^s\d$/.test(k)).map((k) => +k[1]);
     if (fresh.includes('done')) { sel = 5; brief = { n: 6 }; } else if (stg.length) { sel = Math.max(...stg); brief = { n: sel }; }
@@ -372,12 +372,12 @@ async function teamView(id, pageArg) {
     const wait = denied.until > Date.now() ? ` Too many tries: wait ${Math.ceil((denied.until - Date.now()) / 1000)}s.` : '';
     return `<span class="red"><b>ACCESS DENIED.</b> "${esc(denied.text)}" is not it. Check how you decoded the file and try again.${wait}</span>`;
   };
-  const headRight = () => `<span class="mono">TEAM ${esc(T.name.replace('Team ', '').toUpperCase())}</span>${got.vault ? `<a class="mono am" href="#/team/${id}${page === 'vault' ? '' : '/vault'}">${page === 'vault' ? 'CASE FILES' : 'VAULT'}</a>` : ''}
+  const headRight = () => `<span class="mono">TEAM ${esc(T.name.replace('Team ', '').toUpperCase())}</span>${page !== 'main' ? `<a class="mono am" href="#/team/${id}">CASE FILES</a>` : ''}${got.done && page !== 'fragment' ? `<a class="mono am" href="#/team/${id}/fragment">MY FRAGMENT</a>` : ''}${got.vault && page !== 'vault' ? `<a class="mono am" href="#/team/${id}/vault">VAULT</a>` : ''}
       <span class="mono ${liveOk ? 'grn' : 'red'}" id="live"><i class="dot ${liveOk ? '' : 'off'}"></i>${liveOk ? 'LIVE' : 'OFFLINE'}</span><span class="mono grn">SCORE ${score()}</span><span class="mono grn clock" data-clock>${new Date().toTimeString().slice(0, 5)}</span><a class="mono" href="#/" id="out">EXIT</a>`;
 
   function render() {
     clearInterval(typer);
-    return page === 'vault' ? renderVault() : renderMain();
+    return page === 'vault' ? renderVault() : page === 'fragment' && got.done ? renderFragment() : renderMain();
   }
 
   function renderMain() {
@@ -408,11 +408,7 @@ async function teamView(id, pageArg) {
         const r = recap(sel);
         main += `<div class="recap"><div class="lbl">// WHAT THE FILE SAID</div><p class="mono grn" style="word-break:break-word;white-space:pre-wrap">${esc(r.decoded)}</p><p class="dim mono">Recipe: ${esc(r.recipe.join(' → '))}</p></div>`;
         if (sel === 5) {
-          const d = got.done;
-          main += `<div class="term"><div class="th"><span class="fn">vault_fragment.key</span><button class="copy" data-copy2>COPY</button></div><div class="body">
-            <div class="lbl">FRAGMENT ${d.fragment_position} OF 5</div><div class="mono cy frag">${esc(d.fragment)}</div>
-            <div class="lbl" style="margin-top:12px">STEP ${d.step} OF 5: ${esc(d.label)}</div></div></div>
-            <p>The vault needs all five teams. Find the other analysts, and wait for the host to open the vault.</p>${got.vault ? `<a class="btn big" style="display:inline-block;opacity:1;text-decoration:none" href="#/team/${id}/vault">GO TO THE VAULT →</a>` : ''}`;
+          main += `<p>Case file 5 is solved. Your piece of the vault key is kept in its own section, away from the case files.</p><a class="btn big" style="display:inline-block;opacity:1;text-decoration:none" href="#/team/${id}/fragment">OPEN MY FRAGMENT →</a>${got.vault ? ` <a class="btn big" style="display:inline-block;opacity:1;text-decoration:none;background:transparent;color:var(--grn)!important;border:1px solid var(--grn)" href="#/team/${id}/vault">GO TO THE VAULT →</a>` : ''}`;
         }
       }
       main += `</div>`;
@@ -436,7 +432,7 @@ async function teamView(id, pageArg) {
         const d = got.done;
         head = 'FILE RECOVERED';
         lines = ['You found it, analyst.', `This is vault fragment ${d.fragment_position} of 5, and you also hold recipe step ${d.step} of 5.`, 'NullPhantom split the key so that no single team can open the vault.', 'The other four fragments are held by the other teams. Find them.'];
-        btn = 'VIEW MY FRAGMENT →';
+        btn = 'OPEN MY FRAGMENT →';
       } else if (brief.n === 1) {
         head = 'MISSION BRIEFING';
         lines = ['23:41. Someone broke into the CampusConnect student portal.', 'The intruder calls themself NullPhantom.', 'They split the key to their vault into five pieces and hid one piece in each compromised system.', `Your team has access to the ${s1.system} (${s1.host}).`, 'Every file is locked. Read the dossier of each file and solve the riddle in it: the answer is the key. Use the key to open the locked file in CyberChef. Inside you will find an access phrase. Submit it here, and the host will approve it.'];
@@ -453,7 +449,9 @@ async function teamView(id, pageArg) {
         <button class="btn big" id="open" style="animation-delay:${(lines.length * gap * 2 + 0.2).toFixed(1)}s">${esc(btn)}</button></div>`;
       info = ''; hints = '';
     }
-    const notes = `<div class="panel side"><div class="lbl">// TEAM NOTES</div><textarea class="f notes" id="notes" placeholder="keys, riddles, answers... you will need the old ones again">${esc(ls.get('dmc_notes_' + id, ''))}</textarea></div>`;
+    const auto = [1, 2, 3, 4, 5].filter(solved).map((n) => `<div class="anote"><b>FILE ${n}</b> ${esc((recap(n) || {}).note || '')}</div>`).join('');
+    const notes = `<div class="panel side"><div class="lbl">// TEAM NOTES <span class="grn">· WRITTEN FOR YOU</span></div><div class="autonotes">${auto || '<span class="dim">Every key, riddle answer and thing worth remembering from a solved file is written here for you.</span>'}</div>
+      <div class="lbl" style="margin-top:14px">YOUR OWN NOTES</div><textarea class="f notes" id="notes" placeholder="anything else you want to remember">${esc(ls.get('dmc_notes_' + id, ''))}</textarea></div>`;
     $app.innerHTML = chrome(headRight() === '' ? '' : `<span class="mono dim">${s1 ? esc(s1.host) : '—'}</span>` + headRight()) +
       `<main class="tmain">${bcast ? `<div class="bcast">&gt; ${esc(bcast.text)}</div>` : ''}${got.vault ? `<a class="vaultbanner" href="#/team/${id}/vault">THE VAULT IS OPEN → go to the vault</a>` : ''}<div class="opp"><div><div class="oh">OPERATION PROGRESS</div><div class="lbl">TEAM ${esc(T.name.replace('Team ', '').toUpperCase())}${s1 ? ' · ' + esc(s1.system.toUpperCase()) : ''}</div></div>
       <div class="segs">${seg}<span class="frac mono"><b>${Math.max(0, [1, 2, 3, 4, 5].filter(solved).length)}/5</b><br><span class="lbl">STAGES COMPLETED</span></span></div></div>
@@ -462,7 +460,7 @@ async function teamView(id, pageArg) {
       <form class="unlock" id="uf"><span class="lbl">// OFFLINE? ENTER A CODE FROM THE ADMIN</span><div class="prompt" style="max-width:320px"><span class="grn">&gt;</span><input id="uc" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX"><button class="btn">UNLOCK</button></div><span class="err" id="ue">${esc(msg)}</span></form></div>
       <div class="rcol">${info}${hints}${notes}</div></div></main>`;
     $app.querySelectorAll('.card').forEach((b) => (b.onclick = () => { sel = +b.dataset.n; render(); }));
-    const ob = $app.querySelector('#open'); if (ob) ob.onclick = () => { brief = null; animKey = ''; render(); };
+    const ob = $app.querySelector('#open'); if (ob) ob.onclick = () => { const toFrag = brief && brief.n === 6; brief = null; animKey = ''; if (toFrag) go('fragment'); else render(); };
     const af = $app.querySelector('#af'); if (af) af.onsubmit = (ev) => { ev.preventDefault(); const v = $app.querySelector('#ai').value.trim(); if (v && !pending) attempt('stage', v); };
     $app.querySelectorAll('[data-hint]').forEach((bt) => (bt.onclick = () => {
       const k = +bt.dataset.hint;
@@ -507,6 +505,20 @@ async function teamView(id, pageArg) {
       const codes = ls.get(codeKey, []); codes.push(code); ls.set(codeKey, codes);
       afterUnlock(fresh);
     };
+  }
+
+  function renderFragment() {
+    const d = got.done;
+    $app.innerHTML = chrome(headRight()) + `<main class="vmain"><a class="mono" href="#/team/${id}">← BACK TO THE CASE FILES</a>
+      <div class="panel vpanel fragpanel" style="margin-top:14px"><div class="lbl">// YOUR PIECE OF THE VAULT KEY</div><h2 class="t">MY FRAGMENT</h2>
+        <p>NullPhantom split the key to the vault into five pieces, one for each team. This is yours. Keep it safe and find the other four teams: nobody can open the vault alone.</p>
+        <div class="term"><div class="th"><span class="fn">vault_fragment.key</span><button class="copy" data-copy2>COPY</button></div><div class="body">
+          <div class="lbl">FRAGMENT ${d.fragment_position} OF 5</div><div class="mono cy frag">${esc(d.fragment)}</div>
+          <div class="lbl" style="margin-top:14px">RECIPE STEP ${d.step} OF 5</div><div class="mono grn" style="font-size:18px">${esc(d.label)}</div></div></div>
+        <p class="dim">When all five teams have their pieces, the vault opens by itself. You will then join the five fragments in order 1 to 5 and apply the five recipe steps in order 1 to 5 in CyberChef.</p>
+        ${got.vault ? `<a class="btn big" style="display:inline-block;opacity:1;text-decoration:none" href="#/team/${id}/vault">GO TO THE VAULT →</a>` : '<p class="am mono">Waiting for the other teams<span class="cur"></span></p>'}</div></main>`;
+    $app.querySelectorAll('[data-copy2]').forEach((b) => (b.onclick = () => copyText(d.fragment, b)));
+    $app.querySelector('#out').onclick = () => localStorage.removeItem('dmc_team');
   }
 
   function renderVault() {

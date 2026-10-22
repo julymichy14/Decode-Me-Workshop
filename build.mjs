@@ -60,14 +60,14 @@ for (const t of src.teams) {
     if (s.evidence_extra) p.evidence_extra = s.evidence_extra;
     if (s.n === 1) { p.system = t.system; p.host = t.host; }
     const prev = s.n > 1 ? t.stages[s.n - 2] : null;
-    if (prev) p.prev = { decoded: prev.decoded, recipe: prev.recipe };
+    if (prev) p.prev = { decoded: prev.decoded, recipe: prev.recipe, note: prev.note };
     blobs['s' + s.n] = await seal(p, s.n === 1 ? startCode : codes[s.n - 2]);
     at.stages.push({ n: s.n, title: s.title, file: s.file, points: s.points, encoded: s.encoded, decoded: s.decoded,
       recipe: s.recipe, answer: s.answer, keyNote: s.keyNote, key: s.key, hints: s.hints,
       unlockCode: codes[s.n - 1] }); // passphrase the admin console can send as an override
   }
   blobs.done = await seal({
-    prev: { decoded: t.stages[4].decoded, recipe: t.stages[4].recipe },
+    prev: { decoded: t.stages[4].decoded, recipe: t.stages[4].recipe, note: t.stages[4].note },
     fragment: t.fragment, fragment_position: t.fragment_position,
     step: t.vault_recipe_step, label: t.vault_recipe_label,
   }, codes[4]);
